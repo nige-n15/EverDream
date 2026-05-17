@@ -35,6 +35,8 @@ import { transcribeAudioFile, isSpeechRecognitionSupported } from './lib/transcr
 import { transcribeAudio } from './lib/transcriptionWhisper';
 import { WearableSettings } from './components/wearables/WearableSettings';
 import type { WearableConfig, WearableSleepRecord } from './lib/wearables';
+import { DebugPanel } from './components/debug/DebugPanel';
+import { Bug } from 'lucide-react';
 
 const DreamJournalApp = () => {
   const { route, navigate } = useHashRoute();

@@ -1,0 +1,57 @@
+{
+  "expo": {
+    "name": "everdream-mobile",
+    "slug": "everdream-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "everdream",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "experiments": {
+      "typedRoutes": true
+    },
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "app.everdream.mobile",
+      "infoPlist": {
+        "NSFaceIDUsageDescription": "Allow Everdream to protect your dream journal with biometric lock."
+      }
+    },
+    "android": {
+      "package": "app.everdream.mobile",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-secure-store",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Allow Everdream to record voice notes when you capture a dream."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Everdream to record dream video right after you wake up.",
+          "microphonePermission": "Allow Everdream to capture audio along with your dream video.",
+          "recordAudioAndroid": true
+        }
+      ],
+      "expo-asset"
+    ]
+  }
+}

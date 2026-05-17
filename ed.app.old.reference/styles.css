@@ -1,0 +1,494 @@
+:root {
+  --bg: #f5ead6;
+  --ink: #15213a;
+  --muted: #5c6985;
+  --panel: rgba(255, 250, 241, 0.74);
+  --line: rgba(32, 43, 73, 0.12);
+  --accent: #ce6536;
+  --accent-strong: #a8471d;
+  --shadow: 0 24px 60px rgba(16, 20, 37, 0.16);
+  --radius: 28px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: "Trebuchet MS", "Gill Sans", sans-serif;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at top left, rgba(206, 101, 54, 0.12), transparent 28%),
+    radial-gradient(circle at top right, rgba(31, 141, 124, 0.16), transparent 25%),
+    linear-gradient(180deg, #f8f1e7 0%, #f3e4cf 100%);
+  overflow-x: hidden;
+}
+
+h1,
+h2,
+h3,
+strong {
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.glow {
+  position: fixed;
+  width: 28rem;
+  height: 28rem;
+  border-radius: 999px;
+  filter: blur(36px);
+  opacity: 0.45;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.glow-one {
+  top: -10rem;
+  left: -6rem;
+  background: rgba(206, 101, 54, 0.18);
+}
+
+.glow-two {
+  right: -8rem;
+  bottom: -8rem;
+  background: rgba(31, 141, 124, 0.2);
+}
+
+.topbar,
+.page,
+.footer {
+  position: relative;
+  z-index: 1;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 1.5rem;
+  align-items: flex-start;
+  padding: 2.5rem clamp(1.25rem, 3vw, 3rem) 1.5rem;
+}
+
+.brand {
+  margin: 0.25rem 0 0;
+  font-size: clamp(2rem, 5vw, 3.6rem);
+  line-height: 0.95;
+  max-width: 12ch;
+}
+
+.eyebrow {
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.status-row,
+.hero-actions,
+.chip-row,
+.control-row,
+.step-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+}
+
+.status-pill,
+.projection-badge,
+.live-dot,
+.step {
+  border-radius: 999px;
+  padding: 0.45rem 0.9rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+}
+
+.status-pill {
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(32, 43, 73, 0.08);
+}
+
+.page {
+  display: grid;
+  gap: 1.5rem;
+  padding: 0 1.25rem 2.5rem;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(12px);
+}
+
+.hero {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: 1.5rem;
+  padding: clamp(1.5rem, 3vw, 2.5rem);
+}
+
+.hero h2,
+.phone-top h3,
+.results h3,
+.roadmap h3,
+.rail h3 {
+  margin: 0.4rem 0 0.8rem;
+  font-size: clamp(1.55rem, 2vw, 2.4rem);
+  line-height: 1.06;
+}
+
+.lede {
+  margin: 0;
+  max-width: 60ch;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.hero-actions {
+  margin-top: 1.4rem;
+}
+
+.button,
+.chip {
+  border: 0;
+  cursor: pointer;
+  transition: transform 180ms ease, box-shadow 180ms ease, background 180ms ease;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.9rem;
+  padding: 0.9rem 1.2rem;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%);
+  color: #fff7f0;
+  box-shadow: 0 14px 24px rgba(168, 71, 29, 0.2);
+  font-weight: 600;
+}
+
+.button.secondary {
+  background: rgba(255, 255, 255, 0.68);
+  color: var(--ink);
+  box-shadow: none;
+  border: 1px solid rgba(32, 43, 73, 0.08);
+}
+
+.button:hover,
+.chip:hover {
+  transform: translateY(-1px);
+}
+
+.hero-grid,
+.roadmap-grid,
+.score-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.metric-card,
+.roadmap-card,
+.score-card {
+  border-radius: 22px;
+  padding: 1.1rem;
+  border: 1px solid rgba(32, 43, 73, 0.08);
+  background: rgba(255, 255, 255, 0.58);
+}
+
+.metric-label,
+.score-card span,
+.projection-detail span,
+.field span,
+.roadmap-card span {
+  display: block;
+  font-size: 0.77rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+}
+
+.metric-card strong,
+.score-card strong,
+.roadmap-card strong {
+  display: block;
+  margin-top: 0.55rem;
+  font-size: 1.12rem;
+  line-height: 1.2;
+}
+
+.metric-card p,
+.roadmap-card p,
+.stack-item p,
+.projection-copy,
+.footer p,
+.ledger-list p {
+  margin: 0.65rem 0 0;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.workspace,
+.results {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.workspace {
+  grid-template-columns: 1.2fr 0.8fr;
+}
+
+.phone-panel {
+  padding: 1rem;
+}
+
+.phone-shell {
+  background:
+    radial-gradient(circle at top left, rgba(216, 173, 66, 0.16), transparent 25%),
+    linear-gradient(180deg, rgba(12, 22, 47, 0.96) 0%, rgba(18, 31, 62, 0.93) 100%);
+  color: #eef3ff;
+  border-radius: calc(var(--radius) - 8px);
+  padding: 1.25rem;
+  min-height: 100%;
+}
+
+.phone-top,
+.projection-head,
+.resonance-row,
+.ledger-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.live-dot,
+.projection-badge {
+  background: rgba(255, 255, 255, 0.1);
+  color: #f7e6d6;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.step {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(240, 244, 255, 0.76);
+}
+
+.step.active {
+  background: linear-gradient(135deg, rgba(206, 101, 54, 0.9), rgba(216, 173, 66, 0.76));
+  color: #fff7f0;
+}
+
+.field {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.field textarea,
+.field select,
+.field input[type="range"] {
+  width: 100%;
+}
+
+.field textarea,
+.field select {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.07);
+  color: #f0f4ff;
+  padding: 1rem;
+  font: inherit;
+}
+
+.field textarea::placeholder {
+  color: rgba(240, 244, 255, 0.45);
+}
+
+.chip {
+  padding: 0.7rem 1rem;
+  border-radius: 999px;
+  color: #f0f4ff;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.field.compact {
+  min-width: 16rem;
+  flex: 1;
+}
+
+.action-button {
+  min-width: 14rem;
+}
+
+.projection-card {
+  margin-top: 1.25rem;
+  padding: 1rem;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  animation: rise 380ms ease;
+}
+
+.projection-copy {
+  color: rgba(240, 244, 255, 0.82);
+}
+
+.projection-grid,
+.stack-list,
+.roadmap-grid,
+.score-grid {
+  margin-top: 1rem;
+}
+
+.projection-grid,
+.roadmap-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.projection-detail,
+.stack-item {
+  border-radius: 18px;
+  padding: 0.95rem;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.projection-detail strong {
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 1rem;
+  font-family: "Trebuchet MS", "Gill Sans", sans-serif;
+}
+
+.resonance-row {
+  align-items: baseline;
+  margin: 0.7rem 0 1.1rem;
+}
+
+.resonance-row strong {
+  font-size: 2rem;
+}
+
+.rail {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.rail .panel,
+.results .panel,
+.roadmap {
+  padding: 1.35rem;
+}
+
+.endpoint-list,
+.ledger-list {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+}
+
+.endpoint-list li,
+.ledger-list li {
+  padding: 0.9rem 0;
+  border-bottom: 1px solid rgba(32, 43, 73, 0.08);
+}
+
+.endpoint-list li:last-child,
+.ledger-list li:last-child {
+  border-bottom: 0;
+}
+
+.endpoint-list code {
+  font-family: Consolas, "Courier New", monospace;
+  color: var(--accent-strong);
+}
+
+.results {
+  grid-template-columns: 1.15fr 0.85fr;
+}
+
+.score-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.score-card strong {
+  margin-top: 0.45rem;
+  font-size: 1.55rem;
+}
+
+.ledger-list li {
+  align-items: center;
+}
+
+.ledger-meta,
+.ledger-empty {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.hidden {
+  display: none;
+}
+
+.footer {
+  padding: 0 1.25rem 2.5rem;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 1024px) {
+  .hero,
+  .workspace,
+  .results {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .topbar {
+    flex-direction: column;
+  }
+
+  .projection-grid,
+  .roadmap-grid,
+  .score-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .field.compact,
+  .action-button {
+    width: 100%;
+  }
+
+  .phone-shell,
+  .rail .panel,
+  .results .panel,
+  .roadmap,
+  .hero {
+    padding: 1rem;
+  }
+}

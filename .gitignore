@@ -1,0 +1,37 @@
+# ============================================
+# EverDream — .gitignore
+# ============================================
+
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+
+# Large embedded projects (manage separately)
+ed.app.new/OpenCut-AI/
+ed.app.new/puter/
+ed.app.new/supoclip/
+ed.app.new/vllm/
+ed.app.new/hermes-desktop/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Secrets
+.env
+.env.local
+*.key
+*.pem
+
+# Temp
+*.tmp
+*.log
+tsconfig.tsbuildinfo

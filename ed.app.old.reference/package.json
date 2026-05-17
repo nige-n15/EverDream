@@ -1,0 +1,18 @@
+{
+  "name": "subjectivexp-mvp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Frontend MVP for the SubjectiveXP narrate-interact-confirm loop.",
+  "scripts": {
+    "start": "node server.js",
+    "discord:send": "node discord/webhook-relay.js"
+  },
+  "dependencies": {
+    "expo": "^55.0.23"
+  },
+  "devDependencies": {
+    "metro": "^0.80.12",
+    "metro-core": "^0.80.12",
+    "metro-resolver": "^0.80.12"
+  }
+}

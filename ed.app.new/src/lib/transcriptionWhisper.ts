@@ -62,6 +62,48 @@ export class ApiError extends Error {
       default: return 'Something unexpected happened. Please try again.';
     }
   }
+
+  /**
+   * Convert any error into an ApiError instance.
+   * Handles native Error objects, Supabase errors, and string errors.
+   *
+   * @param error — The raw error to convert
+   * @returns An ApiError with the appropriate category
+   */
+  static fromError(error: unknown): ApiError {
+    if (error instanceof ApiError) return error;
+
+    let message = 'Unknown error';
+    let category: ApiError['category'] = 'unknown';
+
+    if (error instanceof Error) {
+      message = error.message;
+    } else if (error && typeof error === 'object' && 'message' in error) {
+      message = String((error as { message: unknown }).message);
+    } else if (typeof error === 'string') {
+      message = error;
+    }
+
+    // Classify by message content
+    const lower = message.toLowerCase();
+    if (lower.includes('network') || lower.includes('offline') || lower.includes('fetch')) {
+      category = 'network';
+    } else if (lower.includes('rate limit') || lower.includes('429') || lower.includes('too many')) {
+      category = 'rate_limit';
+    } else if (lower.includes('unauthorized') || lower.includes('401') || lower.includes('403') || lower.includes('auth')) {
+      category = 'auth';
+    } else if (lower.includes('503') || lower.includes('502') || lower.includes('unavailable') || lower.includes('server')) {
+      category = 'server';
+    } else if (lower.includes('invalid') || lower.includes('400') || lower.includes('validation') || lower.includes('empty') || lower.includes('too large') || tooShort(lower)) {
+      category = 'validation';
+    }
+
+    return new ApiError(message, category);
+  }
+}
+
+function tooShort(lower: string): boolean {
+  return lower.includes('too short') || lower.includes('minimum') || lower.includes('at least');
 }
 
 // ── Types ────────────────────────────────────────────────────

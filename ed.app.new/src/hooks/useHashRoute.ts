@@ -13,7 +13,8 @@ export type RouteScreen =
   | 'achievements'
   | 'assets'
   | 'more'
-  | 'import-photos';
+  | 'import-photos'
+  | 'admin';
 
 export type AppRoute = {
   screen: RouteScreen;
@@ -43,6 +44,7 @@ function parseHash(): AppRoute {
     'assets',
     'more',
     'import-photos',
+    'admin',
   ];
   if (allowed.includes(screen)) {
     return { screen, dreamId: null };

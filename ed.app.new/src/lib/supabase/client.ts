@@ -78,7 +78,7 @@ export async function getProfile(): Promise<Record<string, unknown> | null> {
 }
 
 // ============================================================
--- DREAM CRUD
+// DREAM CRUD
 // ============================================================
 
 export interface DreamRecord {
@@ -178,7 +178,7 @@ export async function softDeleteDream(id: string): Promise<boolean> {
 }
 
 // ============================================================
--- SLEEP SESSION CRUD
+// SLEEP SESSION CRUD
 // ============================================================
 
 export interface SleepSessionRecord {
@@ -262,7 +262,7 @@ export async function updateSleepSession(id: string, updates: Partial<SleepSessi
 }
 
 // ============================================================
--- USER SETTINGS
+// USER SETTINGS
 // ============================================================
 
 export async function fetchUserSettings(userId: string): Promise<Record<string, unknown> | null> {

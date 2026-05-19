@@ -29,7 +29,7 @@ import {
   generateAssetPrompts,
 } from '../../lib/assets/pipeline';
 import type { AssetGenerationJob, AssetType, DreamAsset } from '../../lib/assets/pipeline';
-import type { WebXRAsset } from './WebXRViewer';
+import type { WebXRAsset } from '../vr/WebXRViewer';
 
 // ============================================================
 // TYPES

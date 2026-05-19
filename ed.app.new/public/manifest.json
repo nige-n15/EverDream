@@ -1,0 +1,95 @@
+{
+  "name": "EverDream — AI Dream Journal",
+  "short_name": "EverDream",
+  "description": "Your personal dream journal with AI analysis, dream visualization, and sleep tracking.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f7f5ff",
+  "theme_color": "#5ec4a8",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icons/icon-72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icons/icon-96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icons/icon-128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icons/icon-144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icons/icon-152.png",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icons/icon-384.png",
+      "sizes": "384x384",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable any"
+    }
+  ],
+  "categories": ["health", "lifestyle", "productivity"],
+  "screenshots": [
+    {
+      "src": "/screenshots/journal.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Dream Journal — Main Screen"
+    },
+    {
+      "src": "/screenshots/analysis.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "AI Dream Analysis"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Record Dream",
+      "short_name": "Record",
+      "description": "Record a new dream",
+      "url": "/?action=new-dream",
+      "icons": [{ "src": "/icons/record-96.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Sleep Education",
+      "short_name": "Sleep",
+      "description": "Browse sleep wellness articles",
+      "url": "/?screen=sleep",
+      "icons": [{ "src": "/icons/sleep-96.png", "sizes": "96x96" }]
+    }
+  ],
+  "related_applications": [],
+  "prefer_related_applications": false
+}

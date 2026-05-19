@@ -5,7 +5,7 @@
 
 import React, { useState } from 'react';
 import { Settings, Info, Shield, Zap, Moon, Mic, Activity } from 'lucide-react';
-import { SleepSettings as SleepSettingsType } from '../modules/sleep/types';
+import { SleepSettings as SleepSettingsType } from '../../modules/sleep/types';
 
 interface SleepSettingsProps {
   settings: SleepSettingsType;

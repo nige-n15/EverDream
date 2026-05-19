@@ -9,6 +9,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import type { RouteScreen } from '../hooks/useHashRoute';
+import { useSkinFull } from '../contexts/SkinContext';
 
 type ShellProps = {
   active: RouteScreen;
@@ -29,33 +30,48 @@ const navItems: { screen: RouteScreen; label: string; icon: typeof Home }[] = [
 
 function isNavActive(active: RouteScreen, screen: RouteScreen): boolean {
   if (screen === 'more') {
-    return ['more', 'wearables', 'privacy', 'achievements', 'assets', 'import-photos'].includes(active);
+    return ['more', 'wearables', 'privacy', 'achievements', 'assets', 'import-photos', 'admin'].includes(active);
   }
   return active === screen;
 }
 
 export default function Shell({ active, onNavigate, onOpenSettings, children }: ShellProps) {
+  const { isPearl } = useSkinFull();
+
   return (
-    <div className="min-h-screen bg-paper flex flex-col font-sans text-ink">
-      <header className="sticky top-0 z-40 border-b border-line bg-cream/95 backdrop-blur-md">
+    <div className={`min-h-screen flex flex-col font-sans ${isPearl ? 'text-[var(--text-primary)]' : 'text-ink'}`}>
+      <header className={`sticky top-0 z-40 border-b backdrop-blur-md ${isPearl ? 'border-[var(--glass-border)] bg-[rgba(247,245,255,0.92)]' : 'border-line bg-cream/95'}`}>
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 min-w-0">
-            <div className="w-9 h-9 rounded-full bg-parchment border border-line flex items-center justify-center shadow-paper shrink-0">
+            <div className={`w-9 h-9 rounded-full border flex items-center justify-center shadow-paper shrink-0 ${isPearl ? 'bg-[var(--glass-bg)] border-[var(--glass-border)]' : 'bg-parchment border-line'}`}>
               <Moon className="w-4 h-4 text-duskDeep" strokeWidth={1.75} />
             </div>
             <div className="min-w-0">
-              <p className="font-serif text-lg font-medium tracking-tight text-ink truncate">
-                EverDream Journal
-              </p>
-              <p className="text-[11px] text-muted uppercase tracking-[0.14em] truncate">
-                Dreams · Sleep · Calm reflection
-              </p>
+              {isPearl ? (
+                <>
+                  <p className="text-[18px] font-light tracking-[6px] uppercase text-[var(--text-primary)] truncate">
+                    EVERDREAM
+                  </p>
+                  <p className="text-[10px] text-[var(--text-label)] tracking-[1px] truncate">
+                    Dreams · Sleep · Calm reflection
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="font-serif text-lg font-medium tracking-tight text-ink truncate">
+                    EverDream Journal
+                  </p>
+                  <p className="text-[11px] text-muted uppercase tracking-[0.14em] truncate">
+                    Dreams · Sleep · Calm reflection
+                  </p>
+                </>
+              )}
             </div>
           </div>
           <button
             type="button"
             onClick={onOpenSettings}
-            className="p-2.5 rounded-full border border-line bg-cream hover:bg-parchment transition-colors shrink-0"
+            className={`p-2.5 rounded-full border transition-colors shrink-0 ${isPearl ? 'border-[var(--glass-border)] bg-[var(--glass-bg)] hover:bg-white/80' : 'border-line bg-cream hover:bg-parchment'}`}
             aria-label="Settings"
           >
             <Settings className="w-5 h-5 text-muted" strokeWidth={1.5} />
@@ -65,7 +81,7 @@ export default function Shell({ active, onNavigate, onOpenSettings, children }: 
 
       <main className="flex-1 w-full max-w-lg mx-auto px-4 py-5 pb-28">{children}</main>
 
-      <nav className="fixed bottom-0 inset-x-0 z-40 border-t border-line bg-cream/98 backdrop-blur-md pb-[env(safe-area-inset-bottom,0px)]">
+      <nav className={`fixed bottom-0 inset-x-0 z-40 border-t backdrop-blur-md pb-[env(safe-area-inset-bottom,0px)] ${isPearl ? 'border-[var(--glass-border)] bg-[rgba(247,245,255,0.98)]' : 'border-line bg-cream/98'}`}>
         <div className="max-w-lg mx-auto px-2 pt-2 pb-3 flex justify-around items-end">
           {navItems.map(({ screen, label, icon: Icon }) => {
             const on = isNavActive(active, screen);
@@ -76,15 +92,21 @@ export default function Shell({ active, onNavigate, onOpenSettings, children }: 
                 type="button"
                 onClick={() => onNavigate(screen)}
                 className={`flex flex-col items-center gap-0.5 px-1.5 py-1 rounded-xl transition-colors min-w-[44px] ${
-                  on ? 'text-sageDark' : 'text-muted hover:text-ink'
+                  on
+                    ? isPearl ? 'text-[var(--aqua-deep)]' : 'text-sageDark'
+                    : isPearl ? 'text-[var(--text-label)] hover:text-[var(--text-primary)]' : 'text-muted hover:text-ink'
                 }`}
               >
                 <span
                   className={`flex items-center justify-center rounded-full transition-all ${
                     isRecord
                       ? on
-                        ? 'w-12 h-12 -mt-4 bg-sage text-cream shadow-lift border border-sageDark/20'
-                        : 'w-11 h-11 -mt-3 bg-parchment border border-line text-ink shadow-paper'
+                        ? isPearl
+                          ? 'w-12 h-12 -mt-4 bg-[var(--aqua-deep)] text-white shadow-lift border border-[var(--aqua-deep)]/20'
+                          : 'w-12 h-12 -mt-4 bg-sage text-cream shadow-lift border border-sageDark/20'
+                        : isPearl
+                          ? 'w-11 h-11 -mt-3 bg-[var(--glass-bg)] border border-[var(--glass-border)] text-[var(--text-primary)] shadow-paper'
+                          : 'w-11 h-11 -mt-3 bg-parchment border border-line text-ink shadow-paper'
                       : 'w-9 h-9'
                   }`}
                 >

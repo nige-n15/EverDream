@@ -1,22 +1,20 @@
 /**
- * Audio Transcription Module — Free Tier
+ * Audio Transcription Module — Supabase Edge Function Proxy
  *
- * Uses HuggingFace Inference API for Whisper (free, no GPU needed).
+ * Routes all Whisper transcription through the Supabase Edge Function
+ * `transcribe-audio` instead of calling HuggingFace directly from the client.
+ * This keeps the HF API key server-side.
+ *
  * Falls back to Web Speech API for live mic recording.
  *
- * Environment variable:
- *   VITE_HF_INFERENCE_API_KEY — HuggingFace API token (free at huggingface.co)
- *
- * Model: openai/whisper-large-v3 (free on HF Inference API)
- * Supports 99 languages, auto-detects language.
+ * Environment variables:
+ *   VITE_SUPABASE_URL       — Your Supabase project URL
+ *   VITE_SUPABASE_ANON_KEY  — Your Supabase anon/public key
  */
 
-const HF_WHISPER_URL =
-  'https://api-inference.huggingface.co/models/openai/whisper-large-v3';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const HF_API_KEY = typeof import.meta !== 'undefined'
-  ? (import.meta as any).env?.VITE_HF_INFERENCE_API_KEY || ''
-  : '';
+// ── Types ────────────────────────────────────────────────────
 
 export interface TranscriptionResult {
   text: string;
@@ -26,12 +24,42 @@ export interface TranscriptionResult {
   source: 'hf-whisper' | 'web-speech' | 'fallback';
 }
 
+// ── Constants ────────────────────────────────────────────────
+
+const MAX_RETRIES = 2;
+const RETRY_DELAY_MS = 2000;
+
+// ── Supabase Client ──────────────────────────────────────────
+
+let _supabase: SupabaseClient | null = null;
+
+function getSupabase(): SupabaseClient | null {
+  if (_supabase) return _supabase;
+
+  const url = import.meta.env.VITE_SUPABASE_URL || '';
+  const key = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+
+  if (!url || !key) {
+    console.warn('[Transcription] Supabase credentials not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.');
+    return null;
+  }
+
+  _supabase = createClient(url, key);
+  return _supabase;
+}
+
+async function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// ── Edge Function Transcription ──────────────────────────────
+
 /**
- * Transcribe an audio file using HuggingFree Whisper via HF Inference API.
- * Completely free — no API key needed for public models, but key increases rate limits.
+ * Transcribe audio via Supabase Edge Function (HF Whisper proxy).
+ * Falls back to Web Speech API if Supabase is not configured.
  *
- * @param audioData — Blob, File, ArrayBuffer, or base64 data URL of the audio
- * @param options — language hint ('auto' for auto-detect), timestamps
+ * @param audioData — Blob, File, ArrayBuffer, or base64 data URL
+ * @param options — language hint, progress callback
  */
 export async function transcribeWithWhisper(
   audioData: Blob | File | ArrayBuffer | string,
@@ -46,12 +74,10 @@ export async function transcribeWithWhisper(
   // Convert input to Blob
   let blob: Blob;
   if (typeof audioData === 'string') {
-    // Handle data URL (base64)
     if (audioData.startsWith('data:')) {
       const response = await fetch(audioData);
       blob = await response.blob();
     } else {
-      // Handle raw base64 string
       const binaryString = atob(audioData);
       const bytes = new Uint8Array(binaryString.length);
       for (let i = 0; i < binaryString.length; i++) {
@@ -65,15 +91,90 @@ export async function transcribeWithWhisper(
     blob = audioData as Blob;
   }
 
-  onProgress?.('Uploading audio to Whisper...');
+  const supabase = getSupabase();
 
-  // Build headers
+  // If Supabase is configured, use the edge function
+  if (supabase) {
+    onProgress?.('Uploading audio for transcription...');
+
+    let lastError: Error | null = null;
+
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      if (attempt > 0) {
+        onProgress?.(`Retrying transcription (attempt ${attempt + 1}/${MAX_RETRIES + 1})...`);
+        await delay(RETRY_DELAY_MS);
+      }
+
+      try {
+        // Convert blob to ArrayBuffer for the edge function
+        const arrayBuffer = await blob.arrayBuffer();
+
+        const { data, error } = await supabase.functions.invoke('transcribe-audio', {
+          body: arrayBuffer,
+          headers: {
+            'Content-Type': blob.type || 'audio/wav',
+            'X-Language': language,
+          },
+        });
+
+        if (error) {
+          console.error('[Transcription] Edge function error:', error.message);
+          lastError = new Error(error.message);
+          continue;
+        }
+
+        const result = data as { text?: string; language?: string; error?: string };
+
+        if (result.error) {
+          console.error('[Transcription] Service error:', result.error);
+          lastError = new Error(result.error);
+          continue;
+        }
+
+        onProgress?.('Transcription complete!');
+
+        return {
+          text: (result.text || '').trim(),
+          language: result.language || language,
+          source: 'hf-whisper',
+        };
+      } catch (err) {
+        console.error('[Transcription] Request error:', err);
+        lastError = err instanceof Error ? err : new Error(String(err));
+      }
+    }
+
+    console.warn('[Transcription] All edge function attempts failed, trying Web Speech fallback');
+  }
+
+  // Fallback: direct HF call (if no Supabase) or Web Speech
+  if (!supabase) {
+    return transcribeWithHFDirect(blob, language, onProgress);
+  }
+
+  throw new Error(`Transcription failed after ${MAX_RETRIES + 1} attempts: ${lastError?.message || 'Unknown error'}`);
+}
+
+/**
+ * Direct HuggingFace call (legacy fallback when Supabase is not configured).
+ * @deprecated Use the Supabase Edge Function instead.
+ */
+async function transcribeWithHFDirect(
+  blob: Blob,
+  _language: string,
+  onProgress?: (status: string) => void,
+): Promise<TranscriptionResult> {
+  const HF_WHISPER_URL =
+    'https://api-inference.huggingface.co/models/openai/whisper-large-v3';
+  const HF_API_KEY = import.meta.env.VITE_HF_INFERENCE_API_KEY || '';
+
+  onProgress?.('Uploading audio to Whisper (direct)...');
+
   const headers: Record<string, string> = {};
   if (HF_API_KEY) {
     headers['Authorization'] = `Bearer ${HF_API_KEY}`;
   }
 
-  // HF Inference API for Whisper
   const response = await fetch(HF_WHISPER_URL, {
     method: 'POST',
     headers,
@@ -82,29 +183,22 @@ export async function transcribeWithWhisper(
 
   if (!response.ok) {
     const errorText = await response.text();
-    // If model is loading, retry after delay
-    if (response.status === 503 || errorText.includes('loading')) {
-      onProgress?.('Model is loading, retrying in 5s...');
-      await new Promise((r) => setTimeout(r, 5000));
-      return transcribeWithWhisper(audioData, options);
-    }
     throw new Error(`Whisper API error: ${response.status} — ${errorText}`);
   }
 
   onProgress?.('Transcribing...');
 
   const result = await response.json();
-
-  // HF Whisper returns: { text: "..." } or { text: "...", chunks: [...] }
   const text = result.text || '';
-  const language = result.language || language;
 
   return {
     text: text.trim(),
-    language,
+    language: result.language || language,
     source: 'hf-whisper',
   };
 }
+
+// ── Web Speech API (Live Mic) ────────────────────────────────
 
 /**
  * Transcribe audio from a URL (e.g., a remote audio file).
@@ -193,9 +287,14 @@ export async function transcribeWithWebSpeech(
   });
 }
 
+// ── Smart Transcription (Main Entry Point) ───────────────────
+
 /**
- * Smart transcription — tries HF Whisper first, falls back to Web Speech.
- * This is the main entry point for audio file transcription.
+ * Smart transcription — tries Supabase Edge Function (Whisper) first,
+ * falls back to Web Speech API.
+ *
+ * @param audioData — Blob, File, ArrayBuffer, or data URL
+ * @param options — language hint, preferWebSpeech, progress callback
  */
 export async function transcribeAudio(
   audioData: Blob | File | ArrayBuffer | string,
@@ -207,7 +306,7 @@ export async function transcribeAudio(
 ): Promise<TranscriptionResult> {
   const { preferWebSpeech = false, onProgress } = options;
 
-  // Try HF Whisper first (better quality, works with files)
+  // Try Whisper first (better quality, works with files)
   if (!preferWebSpeech) {
     try {
       onProgress?.('Transcribing with Whisper AI...');
@@ -236,22 +335,34 @@ export async function transcribeAudio(
 }
 
 /**
- * Check if HF Whisper API is available (quick health check).
+ * Check if transcription service is available (quick health check).
  */
 export async function isWhisperAvailable(): Promise<boolean> {
-  try {
-    const headers: Record<string, string> = {};
-    if (HF_API_KEY) headers['Authorization'] = `Bearer ${HF_API_KEY}`;
+  const supabase = getSupabase();
+  if (!supabase) {
+    // Fallback: check HF directly
+    try {
+      const HF_API_KEY = import.meta.env.VITE_HF_INFERENCE_API_KEY || '';
+      const headers: Record<string, string> = {};
+      if (HF_API_KEY) headers['Authorization'] = `Bearer ${HF_API_KEY}`;
+      const silentAudio = new Blob([new Uint8Array(100)], { type: 'audio/wav' });
+      const response = await fetch(
+        'https://api-inference.huggingface.co/models/openai/whisper-large-v3',
+        { method: 'POST', headers, body: silentAudio },
+      );
+      return response.status !== 503;
+    } catch {
+      return false;
+    }
+  }
 
-    // Send a tiny silent audio to test
-    const silentAudio = new Blob([new Uint8Array(100)], { type: 'audio/wav' });
-    const response = await fetch(HF_WHISPER_URL, {
-      method: 'POST',
-      headers,
-      body: silentAudio,
+  // Check Supabase edge function health
+  try {
+    const { error } = await supabase.functions.invoke('transcribe-audio', {
+      body: new ArrayBuffer(0),
     });
-    // Even a 400 error means the API is reachable
-    return response.status !== 503;
+    // Even an error about empty body means the function is reachable
+    return !error || error.message?.includes('audio') || error.message?.includes('empty');
   } catch {
     return false;
   }

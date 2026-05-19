@@ -5,9 +5,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { Moon, Mic, Activity, Power, AlertCircle, Check } from 'lucide-react';
-import { SleepSession } from '../modules/sleep/types';
-import { motionSensorManager } from '../modules/sleep/motionSensor';
-import { audioRecorderManager } from '../modules/sleep/audioRecorder';
+import { SleepSession } from '../../modules/sleep/types';
+import { motionSensorManager } from '../../modules/sleep/motionSensor';
+import { audioRecorderManager } from '../../modules/sleep/audioRecorder';
 
 interface SleepTrackerProps {
   onSessionStart: () => void;

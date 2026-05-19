@@ -22,6 +22,7 @@ import {
   ChevronRight,
   Palette,
   Camera,
+  Check,
 } from 'lucide-react';
 import Shell from './components/Shell';
 import { TrackerScreen } from './components/tracker/TrackerScreen';
@@ -41,6 +42,7 @@ import { useSkinFull } from './contexts/SkinContext';
 import { trackScreenView, startSession, endSession, trackEvent } from './lib/analytics';
 import { initPerformanceMonitor, startAPICall, endAPICall } from './lib/performance';
 import { AppLoadingScreen, ErrorBanner, LoadingOverlay } from './components/ui';
+import { getOrCreateWallet, createDreamNFT, mintNFT, saveNFT, type DreamNFT, type WalletIdentity } from './lib/nft';
 
 const DreamJournalApp = () => {
   const { route, navigate } = useHashRoute();
@@ -98,6 +100,11 @@ const DreamJournalApp = () => {
   const [isLoadingDreams, setIsLoadingDreams] = useState(true);
   const [dreamError, setDreamError] = useState<string | null>(null);
   const [showAssetInfo, setShowAssetInfo] = useState(false);
+  const [showMintModal, setShowMintModal] = useState(false);
+  const [isMinting, setIsMinting] = useState(false);
+  const [mintedNFT, setMintedNFT] = useState<DreamNFT | null>(null);
+  const [mintError, setMintError] = useState<string | null>(null);
+  const [wallet, setWallet] = useState<WalletIdentity | null>(null);
   const [capturedEmotions, setCapturedEmotions] = useState<EmotionCapture | null>(null);
   const [wearableData, setWearableData] = useState<WearableSleepRecord[]>([]);
   const [wearableConfigs, setWearableConfigs] = useState<WearableConfig[]>([
@@ -1143,6 +1150,46 @@ Respond ONLY with valid JSON, no markdown.`
   const shareDream = (dream) => {
     setSelectedDream(dream);
     setShowShareModal(true);
+  };
+
+  // ── NFT Minting ──────────────────────────────────────────────
+  const handleOpenMintModal = (dream) => {
+    setMintError(null);
+    setMintedNFT(null);
+    const w = getOrCreateWallet();
+    setWallet(w);
+    setShowMintModal(true);
+  };
+
+  const handleMintNFT = async (dream) => {
+    if (!wallet) return;
+    setMintError(null);
+    setIsMinting(true);
+
+    try {
+      const nft = createDreamNFT(
+        {
+          id: dream.id,
+          content: dream.content,
+          category: dream.category,
+          themes: dream.themes || [],
+          emotion: dream.emotion || 'neutral',
+          symbols: dream.symbols || [],
+          narrative: dream.narrative || dream.content,
+          nugget: dream.nugget || dream.content.substring(0, 100),
+          generatedImage: dream.generatedImage ? { url: dream.generatedImage.url } : undefined,
+        },
+        wallet
+      );
+
+      const minted = await mintNFT(nft);
+      saveNFT(minted);
+      setMintedNFT(minted);
+    } catch (err) {
+      setMintError(err instanceof Error ? err.message : 'Minting failed');
+    } finally {
+      setIsMinting(false);
+    }
   };
 
   const generateShareableImage = () => {
@@ -2599,6 +2646,14 @@ Respond ONLY with valid JSON, no markdown.`
                 <Upload className="w-4 h-4" strokeWidth={1.75} />
                 Share
               </button>
+              <button
+                type="button"
+                onClick={() => handleOpenMintModal(detailDream)}
+                className="flex-1 border-2 border-dusk/30 bg-dusk/5 hover:bg-dusk/10 text-duskDeep py-3 rounded-xl transition flex items-center justify-center gap-2 font-medium text-sm"
+              >
+                <Award className="w-4 h-4" strokeWidth={1.75} />
+                Mint NFT
+              </button>
             </div>
           </div>
           </div>
@@ -2844,6 +2899,112 @@ Respond ONLY with valid JSON, no markdown.`
               <Download className="w-4 h-4" />
               Download Asset Metadata (JSON)
             </button>
+          </div>
+        </Modal>
+      )}
+
+      {/* Mint NFT Modal */}
+      {showMintModal && selectedDream && (
+        <Modal onClose={() => setShowMintModal(false)}>
+          <div className="space-y-4">
+            <h2 className="text-xl font-semibold flex items-center gap-2">
+              <Award className="w-5 h-5 text-dusk" />
+              Mint Dream NFT
+            </h2>
+
+            {/* Wallet Info */}
+            {wallet && (
+              <div className="rounded-xl border border-sage/20 bg-sage/5 p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Shield className="w-4 h-4 text-sage" />
+                  <span className="text-sm font-semibold text-ink">Your Wallet</span>
+                </div>
+                <code className="text-xs text-muted block truncate">{wallet.address}</code>
+                <p className="text-xs text-muted mt-1">Display name: {wallet.displayName}</p>
+              </div>
+            )}
+
+            {/* NFT Preview */}
+            <div className="rounded-xl border border-line bg-parchment/60 p-4">
+              <h3 className="text-sm font-semibold text-ink mb-2">NFT Preview</h3>
+              <div className="space-y-2 text-sm">
+                <div>
+                  <span className="text-xs text-muted uppercase tracking-wide">Name</span>
+                  <p className="text-ink font-medium">{selectedDream.nugget || 'Untitled Dream'}</p>
+                </div>
+                <div>
+                  <span className="text-xs text-muted uppercase tracking-wide">Category</span>
+                  <p className="text-ink capitalize">{selectedDream.category}</p>
+                </div>
+                {selectedDream.themes && selectedDream.themes.length > 0 && (
+                  <div>
+                    <span className="text-xs text-muted uppercase tracking-wide">Themes</span>
+                    <p className="text-ink">{selectedDream.themes.join(', ')}</p>
+                  </div>
+                )}
+                {selectedDream.generatedImage && (
+                  <div>
+                    <span className="text-xs text-muted uppercase tracking-wide">Artwork</span>
+                    <img
+                      src={selectedDream.generatedImage.url}
+                      alt="Dream artwork"
+                      className="w-full max-h-32 object-cover rounded-lg mt-1"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Error */}
+            {mintError && (
+              <div className="rounded-xl border border-rose-200 bg-rose-50 p-3">
+                <p className="text-sm text-rose-600">{mintError}</p>
+              </div>
+            )}
+
+            {/* Minted Result */}
+            {mintedNFT && mintedNFT.status === 'minted' && (
+              <div className="rounded-xl border border-sage/20 bg-sage/5 p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Check className="w-5 h-5 text-sage" />
+                  <span className="text-sm font-semibold text-sageDark">NFT Minted!</span>
+                </div>
+                <div className="text-xs space-y-1 text-muted">
+                  <div><strong>Token ID:</strong> <code>{mintedNFT.tokenId}</code></div>
+                  <div><strong>Contract:</strong> <code className="text-[10px]">{mintedNFT.contractAddress?.slice(0, 10)}...</code></div>
+                  <div><strong>Tx:</strong> <code className="text-[10px]">{mintedNFT.txHash?.slice(0, 10)}...</code></div>
+                </div>
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowMintModal(false)}
+                className="flex-1 border border-line bg-parchment hover:bg-parchment/80 py-3 rounded-xl font-semibold transition text-sm text-ink"
+              >
+                {mintedNFT ? 'Close' : 'Cancel'}
+              </button>
+              {!mintedNFT && (
+                <button
+                  onClick={() => handleMintNFT(selectedDream)}
+                  disabled={isMinting}
+                  className="flex-1 bg-sage hover:bg-sageDark disabled:opacity-45 py-3 rounded-xl font-semibold transition text-cream text-sm flex items-center justify-center gap-2"
+                >
+                  {isMinting ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-cream border-t-transparent rounded-full animate-spin" />
+                      Minting...
+                    </>
+                  ) : (
+                    <>
+                      <Award className="w-4 h-4" />
+                      Confirm Mint
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
           </div>
         </Modal>
       )}

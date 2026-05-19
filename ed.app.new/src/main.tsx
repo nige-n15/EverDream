@@ -2,7 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { ensureBrowserStorage } from './lib/storage';
 import { SkinProvider } from './contexts/SkinContext';
-import { AuthProvider } from './hooks/use-auth';
+import { AuthProvider } from './hooks/use-auth.tsx';
 import App from './App';
 import './index.css';
 import './skins/pearl-light.css';

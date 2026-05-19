@@ -20,3 +20,9 @@ export { default as DreamSkeleton } from './DreamSkeleton';
 export type { DreamSkeletonProps } from './DreamSkeleton';
 
 export { default as DreamVisualizer } from './DreamVisualizer';
+export { default as DreamJournal } from './DreamJournal';
+export { default as NFTMintButton } from './NFTMintButton';
+export { default as DreamCapture } from './DreamCapture';
+export type { DreamCaptureResult } from './DreamCapture';
+export { default as PipelineProgress } from './PipelineProgress';
+export type { PipelineStep } from './PipelineProgress';

@@ -6,8 +6,8 @@
 
 import React, { useState } from 'react';
 import { Heart, MessageCircle, Zap } from 'lucide-react';
-import { MorningCheckIn, SleepData } from '../modules/sleep/types';
-import { sleepScoreCalculator } from '../modules/sleep/scoreCalculator';
+import { MorningCheckIn, SleepData } from '../../modules/sleep/types';
+import { sleepScoreCalculator } from '../../modules/sleep/scoreCalculator';
 
 interface MorningCheckInProps {
   sleepData: SleepData;

@@ -14,10 +14,10 @@
  *   VITE_HF_INFERENCE_API_KEY  — HuggingFace (for Whisper transcription)
  */
 
-import { transcribeAudio, type TranscriptionResult } from '../transcriptionWhisper';
-import { analyzeDreamWithAI, type DreamAnalysis } from '../api/anthropic';
-import { generateDreamImage, type DreamAsset } from '../../modules/sleep/dreamAssetGenerator';
-import { generateParallaxVideo } from '../assets/pipeline';
+import { transcribeAudio, type TranscriptionResult } from './transcriptionWhisper';
+import { analyzeDreamWithAI, type DreamAnalysis } from './api/anthropic';
+import { generateDreamImage, type DreamAsset } from '../modules/sleep/dreamAssetGenerator';
+import { generateParallaxVideo } from './assets/pipeline';
 
 // ============================================================
 // TYPES

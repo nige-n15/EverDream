@@ -20,6 +20,7 @@ import {
   Watch,
   ArrowLeft,
   ChevronRight,
+  Palette,
   Camera,
 } from 'lucide-react';
 import Shell from './components/Shell';
@@ -35,11 +36,15 @@ import { transcribeAudioFile, isSpeechRecognitionSupported } from './lib/transcr
 import { transcribeAudio } from './lib/transcriptionWhisper';
 import { WearableSettings } from './components/wearables/WearableSettings';
 import type { WearableConfig, WearableSleepRecord } from './lib/wearables';
-import { DebugPanel } from './components/debug/DebugPanel';
-import { Bug } from 'lucide-react';
+import AdminDashboard from './components/admin/AdminDashboard';
+import { useSkinFull } from './contexts/SkinContext';
+import { trackScreenView, startSession, endSession, trackEvent } from './lib/analytics';
+import { initPerformanceMonitor, startAPICall, endAPICall } from './lib/performance';
+import { AppLoadingScreen } from './components/ui';
 
 const DreamJournalApp = () => {
   const { route, navigate } = useHashRoute();
+  const { skin, setSkin, isPearl } = useSkinFull();
   const [dreams, setDreams] = useState([]);
   const [isRecording, setIsRecording] = useState(false);
   const [currentEntry, setCurrentEntry] = useState('');
@@ -88,6 +93,8 @@ const DreamJournalApp = () => {
     sleepQuality: 3
   });
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const [isAppLoading, setIsAppLoading] = useState(true);
+  const [loadingMessage, setLoadingMessage] = useState('Loading your dreams...');
   const [showAssetInfo, setShowAssetInfo] = useState(false);
   const [capturedEmotions, setCapturedEmotions] = useState<EmotionCapture | null>(null);
   const [wearableData, setWearableData] = useState<WearableSleepRecord[]>([]);
@@ -256,7 +263,24 @@ const DreamJournalApp = () => {
       }
     };
     loadData();
+    // Signal loading complete after data is fetched
+    setTimeout(() => setIsAppLoading(false), 600);
   }, []);
+
+  // Initialize analytics & performance monitoring
+  useEffect(() => {
+    const session = startSession();
+    initPerformanceMonitor(session.id);
+
+    return () => {
+      endSession();
+    };
+  }, []);
+
+  // Track screen views on route change
+  useEffect(() => {
+    trackScreenView(route.screen);
+  }, [route.screen]);
 
   // Save dreams
   const saveDreamsToStorage = async (dreamsToSave) => {
@@ -270,9 +294,11 @@ const DreamJournalApp = () => {
   // Generate dream image using free AI image generation (Pollinations.ai)
   const generateDreamImageAsync = async (dreamData: any) => {
     setIsGeneratingImage(true);
+    const perfCall = startAPICall('image_gen', 'pollinations.ai', 'GET', route.screen);
     try {
       const prompt = dreamData.narrative || dreamData.nugget || dreamData.content || 'a surreal dreamscape';
       const asset = await generateDreamImage(prompt);
+      endAPICall(perfCall, 200);
       return {
         url: asset.url,
         prompt: asset.prompt,
@@ -281,6 +307,7 @@ const DreamJournalApp = () => {
         source: asset.source,
       };
     } catch (error) {
+      endAPICall(perfCall, 0, String(error));
       console.error('Image generation error:', error);
       return {
         url: 'https://images.unsplash.com/photo-1518176258769-f227c798150e?w=800',
@@ -342,11 +369,33 @@ const DreamJournalApp = () => {
   // AI Analysis with image generation
   const analyzeDream = async (text) => {
     setIsProcessing(true);
+    const perfCall = startAPICall('anthropic', '/v1/messages', 'POST', route.screen);
     try {
+      const anthropicKey = import.meta.env.VITE_ANTHROPIC_API_KEY || '';
+      if (!anthropicKey) {
+        console.warn('[analyzeDream] VITE_ANTHROPIC_API_KEY not set — returning fallback');
+        return {
+          category: 'uncategorized',
+          themes: ['dream', 'experience'],
+          emotion: 'neutral',
+          symbols: [],
+          narrative: text,
+          nugget: text.substring(0, 100) + '...',
+          interpretation: {
+            symbols: {},
+            meaning: 'Analysis unavailable — configure VITE_ANTHROPIC_API_KEY',
+            commonPattern: ''
+          }
+        };
+      }
+
       const response = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "x-api-key": anthropicKey,
+          "anthropic-version": "2023-06-01",
+          "anthropic-dangerous-direct-browser-access": "true",
         },
         body: JSON.stringify({
           model: "claude-sonnet-4-20250514",
@@ -378,12 +427,35 @@ Respond ONLY with valid JSON, no markdown.`
         })
       });
 
+      endAPICall(perfCall, response.status);
+
+      if (!response.ok) {
+        const errText = await response.text();
+        console.error('[analyzeDream] Anthropic API error:', response.status, errText);
+        return {
+          category: 'uncategorized',
+          themes: ['dream', 'experience'],
+          emotion: 'neutral',
+          symbols: [],
+          narrative: text,
+          nugget: text.substring(0, 100) + '...',
+          interpretation: {
+            symbols: {},
+            meaning: `Analysis unavailable (API error ${response.status})`,
+            commonPattern: ''
+          }
+        };
+      }
+
       const data = await response.json();
-      const analysisText = data.content.find(c => c.type === 'text')?.text || '{}';
+      const analysisText = data.content?.find(c => c.type === 'text')?.text || '{}';
       const cleanText = analysisText.replace(/```json|```/g, '').trim();
-      return JSON.parse(cleanText);
+      const parsed = JSON.parse(cleanText);
+      console.info('[analyzeDream] Analysis complete:', parsed.category, parsed.themes?.join(','));
+      return parsed;
     } catch (error) {
-      console.error('AI analysis error:', error);
+      endAPICall(perfCall, 0, String(error));
+      console.error('[analyzeDream] AI analysis error:', error);
       return {
         category: 'uncategorized',
         themes: ['dream', 'experience'],
@@ -1249,6 +1321,8 @@ Respond ONLY with valid JSON, no markdown.`
   const correlations = getDreamSleepCorrelations();
 
   return (
+    <>
+      {isAppLoading && <AppLoadingScreen message={loadingMessage} />}
     <Shell
       active={route.screen}
       onNavigate={navigate}
@@ -2527,6 +2601,51 @@ Respond ONLY with valid JSON, no markdown.`
           <p className="text-sm text-muted">
             Sleep sync, keepsakes, milestones, and your data choices.
           </p>
+
+          {/* Skin / Theme Toggle */}
+          <div className={`rounded-2xl border p-4 ${isPearl ? 'border-[var(--glass-border)] bg-[var(--glass-bg)]' : 'border-line bg-cream'}`}>
+            <div className="flex items-center gap-3">
+              <span className={`flex h-10 w-10 items-center justify-center rounded-full border ${isPearl ? 'bg-[var(--aqua-light)]/20 border-[var(--glass-border)]' : 'bg-parchment border-line'}`}>
+                <Palette className="w-5 h-5 text-duskDeep" strokeWidth={1.75} />
+              </span>
+              <div className="flex-1 min-w-0">
+                <span className="block font-medium text-ink">App Skin</span>
+                <span className="block text-xs text-muted">
+                  {isPearl ? 'Pearl Light — iridescent, airy, luminous' : 'Paper — warm, parchment, grounded'}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSkin(isPearl ? 'default' : 'pearl')}
+                className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
+                  isPearl ? 'bg-[var(--aqua-deep)]' : 'bg-sage'
+                }`}
+                aria-label="Toggle skin"
+              >
+                <span
+                  className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                    isPearl ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+            {isPearl && (
+              <div className="mt-3 flex gap-2">
+                {[
+                  { color: '#f7f5ff', label: 'Pearl' },
+                  { color: '#a8eddc', label: 'Aqua' },
+                  { color: '#c8b8ff', label: 'Lavender' },
+                  { color: '#c49a42', label: 'Gold' },
+                ].map(({ color, label }) => (
+                  <div key={label} className="flex items-center gap-1.5">
+                    <span className="w-3 h-3 rounded-full border border-white/50" style={{ background: color }} />
+                    <span className="text-[10px] text-muted">{label}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           <div className="space-y-2">
             {[
               { label: 'Import journal photos', sub: 'OCR from pictures', screen: 'import-photos' as const, icon: Camera },
@@ -2534,6 +2653,7 @@ Respond ONLY with valid JSON, no markdown.`
               { label: 'Keepsakes', sub: 'Images & provenance', screen: 'assets' as const, icon: Shield },
               { label: 'Achievements', sub: 'Small wins', screen: 'achievements' as const, icon: Award },
               { label: 'Privacy & data', sub: 'Export, erase, controls', screen: 'privacy' as const, icon: Eye },
+              { label: 'Analytics dashboard', sub: 'Usage & performance', screen: 'admin' as const, icon: Activity },
             ].map(({ label, sub, screen, icon: Icon }) => (
               <button
                 key={screen}
@@ -2552,6 +2672,23 @@ Respond ONLY with valid JSON, no markdown.`
               </button>
             ))}
           </div>
+        </div>
+      )}
+
+      {route.screen === 'admin' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="font-serif text-2xl font-medium text-ink">Analytics Dashboard</h2>
+            <button
+              type="button"
+              onClick={() => navigate('more')}
+              className="p-2 rounded-full border border-line bg-cream hover:bg-parchment transition"
+              aria-label="Back"
+            >
+              <ArrowLeft className="w-5 h-5 text-muted" strokeWidth={1.5} />
+            </button>
+          </div>
+          <AdminDashboard onClose={() => navigate('more')} />
         </div>
       )}
 
@@ -3079,6 +3216,7 @@ Respond ONLY with valid JSON, no markdown.`
         </Modal>
       )}
     </Shell>
+    </>
   );
 };
 

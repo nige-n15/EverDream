@@ -14,7 +14,7 @@ import {
   Activity,
   ArrowRight,
 } from 'lucide-react';
-import { SleepData } from '../modules/sleep/types';
+import { SleepData } from '../../modules/sleep/types';
 
 interface SleepDashboardProps {
   sleepData: SleepData;

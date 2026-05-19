@@ -6,7 +6,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Camera, X, Play, Pause, RotateCcw, CheckCircle, Moon, Sun, Zap } from 'lucide-react';
-import { SleepData, MorningCheckIn } from '../modules/sleep/types';
+import { SleepData, MorningCheckIn } from '../../modules/sleep/types';
 
 interface MorningNotificationFlowProps {
   sleepData: SleepData;

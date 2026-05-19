@@ -1,33 +1,63 @@
-import React, { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { X, Sparkles, ImagePlus, Sparkle } from 'lucide-react';
 import { generateDreamAssets } from '../../modules/sleep/dreamAssetGenerator';
 import type { DreamAsset } from '../../modules/sleep/types';
+import { useRateLimiter } from '../../lib/hooks/useDebounce';
+import { ErrorBanner } from '../ui/ErrorBanner';
 
 interface DreamAssetGeneratorProps {
   onClose?: () => void;
 }
 
+/**
+ * Dream Asset Generator Component
+ *
+ * Generates visual assets from dream text using AI image generation.
+ * Features:
+ * - 2-second debounce on generate button to prevent API spam
+ * - User-friendly error messages with retry buttons
+ * - Automatic fallback through multiple providers
+ *
+ * @param onClose - Callback to close the modal
+ */
 export const DreamAssetGenerator: React.FC<DreamAssetGeneratorProps> = ({ onClose }) => {
   const [dreamText, setDreamText] = useState(
     'A glowing moonlit garden with floating lanterns, soft music in the air, and a river of stars.'
   );
   const [assets, setAssets] = useState<DreamAsset[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
-  const handleGenerate = async () => {
+  // 2-second rate limit on API calls
+  const { call: rateLimitedCall, isThrottled } = useRateLimiter(2000);
+
+  const handleGenerate = useCallback(async () => {
     setError(null);
     setIsGenerating(true);
     try {
       const generated = await generateDreamAssets(dreamText, 2);
       setAssets(generated);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unable to generate assets';
-      setError(message);
+      console.error('[DreamAssetGenerator] Generation failed:', err);
+      setError(err);
     } finally {
       setIsGenerating(false);
     }
-  };
+  }, [dreamText]);
+
+  // Rate-limited version of handleGenerate
+  const handleDebouncedGenerate = useCallback(() => {
+    rateLimitedCall(handleGenerate);
+  }, [rateLimitedCall, handleGenerate]);
+
+  // Retry: clear error and try again
+  const handleRetry = useCallback(() => {
+    setRetryCount((c) => c + 1);
+    handleDebouncedGenerate();
+  }, [handleDebouncedGenerate]);
+
+  const isDisabled = isGenerating || isThrottled || dreamText.trim().length === 0;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
@@ -62,20 +92,28 @@ export const DreamAssetGenerator: React.FC<DreamAssetGeneratorProps> = ({ onClos
             />
             <div className="flex flex-wrap gap-3 items-center">
               <button
-                onClick={handleGenerate}
-                disabled={isGenerating || dreamText.trim().length === 0}
+                onClick={handleDebouncedGenerate}
+                disabled={isDisabled}
                 className="inline-flex items-center gap-2 rounded-3xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-violet-500/20 hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-60 transition"
               >
                 <ImagePlus className="w-4 h-4" />
-                {isGenerating ? 'Generating…' : 'Generate Assets'}
+                {isGenerating ? 'Generating…' : isThrottled ? 'Waiting…' : 'Generate Assets'}
               </button>
               <span className="text-xs text-slate-400">
                 Puter AI provides free unlimited image generation. If unavailable, a visual fallback is used.
               </span>
             </div>
-            {error && (
-              <div className="rounded-2xl border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-200">
-                <strong>Error:</strong> {error}
+
+            {/* Error banner with retry */}
+            <ErrorBanner
+              error={error}
+              onRetry={handleRetry}
+              onDismiss={() => setError(null)}
+            />
+
+            {retryCount > 0 && !error && (
+              <div className="text-xs text-slate-500">
+                Retry attempt {retryCount} — generation may take a moment
               </div>
             )}
           </div>

@@ -3,6 +3,7 @@ import { Card, Badge, Button, Spinner, Modal } from '../ui';
 import { ArrowLeft, Share2, Download, Sparkles, Brain, Eye, Image, Copy, Check } from 'lucide-react';
 import { getEmotionEmoji } from '../../utils/dreamPresentation';
 import type { Dream } from './DreamList';
+import DreamVisualizer from './DreamVisualizer';
 
 export interface DreamDetailProps {
   dream: Dream | null;
@@ -222,8 +223,20 @@ function DreamDetailContent({
         </p>
       </Card>
 
-      {/* Generated Image */}
-      {dream.imageUrl && (
+      {/* Dream Visualizer — NEW */}
+      <DreamVisualizer
+        dreamId={dream.id}
+        dreamText={dream.content}
+        dreamTitle={dream.title}
+        existingImageUrl={dream.imageUrl}
+        onImageGenerated={(asset) => {
+          // Update the dream's imageUrl in-place
+          dream.imageUrl = asset.url;
+        }}
+      />
+
+      {/* Legacy Generated Image (for backwards compat) */}
+      {dream.imageUrl && !dream.aiAnalysis && (
         <Card style={{ marginBottom: '24px', overflow: 'hidden', padding: 0 }}>
           <div style={{ position: 'relative' }}>
             {!imageLoaded && (

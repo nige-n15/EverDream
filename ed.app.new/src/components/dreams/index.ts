@@ -18,3 +18,5 @@ export type { ShareModalProps } from './ShareModal';
 
 export { default as DreamSkeleton } from './DreamSkeleton';
 export type { DreamSkeletonProps } from './DreamSkeleton';
+
+export { default as DreamVisualizer } from './DreamVisualizer';

@@ -1,12 +1,12 @@
 {
-  "name": "EverDream — AI Dream Journal",
-  "short_name": "EverDream",
+  "name": "Lucid — Dream Journal",
+  "short_name": "Lucid",
   "description": "Your personal dream journal with AI analysis, dream visualization, and sleep tracking.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f7f5ff",
-  "theme_color": "#5ec4a8",
-  "orientation": "portrait-primary",
+  "background_color": "#0f0f1a",
+  "theme_color": "#1a1a2e",
+  "orientation": "portrait",
   "icons": [
     {
       "src": "/icons/icon-72.png",
@@ -58,22 +58,6 @@
     }
   ],
   "categories": ["health", "lifestyle", "productivity"],
-  "screenshots": [
-    {
-      "src": "/screenshots/journal.png",
-      "sizes": "1080x1920",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "Dream Journal — Main Screen"
-    },
-    {
-      "src": "/screenshots/analysis.png",
-      "sizes": "1080x1920",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "AI Dream Analysis"
-    }
-  ],
   "shortcuts": [
     {
       "name": "Record Dream",
@@ -81,13 +65,6 @@
       "description": "Record a new dream",
       "url": "/?action=new-dream",
       "icons": [{ "src": "/icons/record-96.png", "sizes": "96x96" }]
-    },
-    {
-      "name": "Sleep Education",
-      "short_name": "Sleep",
-      "description": "Browse sleep wellness articles",
-      "url": "/?screen=sleep",
-      "icons": [{ "src": "/icons/sleep-96.png", "sizes": "96x96" }]
     }
   ],
   "related_applications": [],

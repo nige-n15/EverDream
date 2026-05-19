@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import DreamJournalApp from './DreamJournalApp';
 import { DreamAssetGenerator } from './components/sleep/DreamAssetGenerator';
+import ProtectedRoute from './components/auth/ProtectedRoute';
+import PWAInstallPrompt from './components/auth/PWAInstallPrompt';
 
 export default function App() {
   const [showAssetGenerator, setShowAssetGenerator] = useState(false);
 
   return (
-    <>
+    <ProtectedRoute>
       <DreamJournalApp />
 
       <button
@@ -32,6 +34,8 @@ export default function App() {
       {showAssetGenerator && (
         <DreamAssetGenerator onClose={() => setShowAssetGenerator(false)} />
       )}
-    </>
+
+      <PWAInstallPrompt />
+    </ProtectedRoute>
   );
 }

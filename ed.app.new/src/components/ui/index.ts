@@ -27,6 +27,9 @@ export type { ToastMessage } from './Toast';
 export { default as AppLoadingScreen } from './AppLoadingScreen';
 export type { AppLoadingScreenProps } from './AppLoadingScreen';
 
+export { ErrorBanner, InlineError } from './ErrorBanner';
+export type { ErrorBannerProps } from './ErrorBanner';
+
 // Inject global keyframes once
 if (typeof document !== 'undefined') {
   const id = 'everdream-ui-keyframes';

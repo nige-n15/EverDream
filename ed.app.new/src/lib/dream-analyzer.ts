@@ -30,6 +30,7 @@ export interface DreamAnalysis {
   symbols: string[];
   narrative: string;
   nugget: string;
+  valence?: number;
   interpretation: {
     symbols: Record<string, string>;
     meaning: string;
@@ -61,6 +62,7 @@ const ANALYSIS_PROMPT = `Analyze this dream and provide a detailed response in J
   "symbols": ["symbol1", "symbol2", "symbol3"],
   "narrative": "expanded 200-word vivid narrative in first person present tense",
   "nugget": "one captivating sentence (15-20 words)",
+  "valence": -1.0 to 1.0 (negative to positive emotional tone),
   "interpretation": {
     "symbols": {
       "symbol1": "what it represents",

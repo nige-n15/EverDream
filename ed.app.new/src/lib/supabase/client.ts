@@ -293,3 +293,126 @@ export async function upsertUserSettings(userId: string, settings: Record<string
   }
   return data;
 }
+
+// ============================================================
+// NFT CRUD
+// ============================================================
+
+export interface NFTRecord {
+  id: string;
+  dream_id: string | null;
+  user_id: string;
+  owner_address: string;
+  creator_address: string;
+  name: string;
+  description: string | null;
+  image_url: string | null;
+  animation_url: string | null;
+  external_url: string | null;
+  metadata: Record<string, unknown> | null;
+  attributes: Record<string, unknown>[] | null;
+  status: 'pending' | 'minted' | 'failed';
+  tx_hash: string | null;
+  contract_address: string | null;
+  token_id: string | null;
+  parent_nft_ids: string[] | null;
+  royalty_splits: Record<string, unknown> | null;
+  license: string;
+  allow_remix: boolean;
+  minted_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function fetchNFTs(userId: string, limit = 100): Promise<NFTRecord[]> {
+  const { data, error } = await supabase
+    .from('nfts')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    console.error('[Supabase] fetchNFTs error:', error);
+    return [];
+  }
+  return data || [];
+}
+
+export async function insertNFT(nft: Partial<NFTRecord>): Promise<NFTRecord | null> {
+  const { data, error } = await supabase
+    .from('nfts')
+    .insert(nft)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('[Supabase] insertNFT error:', error);
+    return null;
+  }
+  return data;
+}
+
+export async function updateNFT(id: string, updates: Partial<NFTRecord>): Promise<NFTRecord | null> {
+  const { data, error } = await supabase
+    .from('nfts')
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('[Supabase] updateNFT error:', error);
+    return null;
+  }
+  return data;
+}
+
+// ============================================================
+// DREAM ASSETS CRUD
+// ============================================================
+
+export interface DreamAssetRecord {
+  id: string;
+  dream_id: string;
+  user_id: string;
+  asset_type: string;
+  prompt: string | null;
+  url: string | null;
+  source: string | null;
+  style: string;
+  metadata: Record<string, unknown> | null;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  error: string | null;
+  attempts: number;
+  created_at: string;
+  completed_at: string | null;
+}
+
+export async function insertDreamAsset(asset: Partial<DreamAssetRecord>): Promise<DreamAssetRecord | null> {
+  const { data, error } = await supabase
+    .from('dream_assets')
+    .insert(asset)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('[Supabase] insertDreamAsset error:', error);
+    return null;
+  }
+  return data;
+}
+
+export async function fetchDreamAssets(dreamId: string): Promise<DreamAssetRecord[]> {
+  const { data, error } = await supabase
+    .from('dream_assets')
+    .select('*')
+    .eq('dream_id', dreamId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('[Supabase] fetchDreamAssets error:', error);
+    return [];
+  }
+  return data || [];
+}

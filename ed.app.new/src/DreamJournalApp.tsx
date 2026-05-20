@@ -46,6 +46,7 @@ import { getOrCreateWallet, createDreamNFT, mintNFT, saveNFT, type DreamNFT, typ
 import DreamVisualizer from './components/dreams/DreamVisualizer';
 import DreamCapture from './components/dreams/DreamCapture';
 import { analyzeDream, type DreamAnalysis } from './lib/dream-analyzer';
+import { generateDreamImage } from './modules/sleep/dreamAssetGenerator';
 
 const DreamJournalApp = () => {
   const { route, navigate } = useHashRoute();
@@ -2166,302 +2167,53 @@ Respond ONLY with valid JSON, no markdown.`
           </div>
         )}
 
-      {/* Record (full page) */}
+      {/* Record (full page) — uses DreamCapture with pipeline progress */}
       {route.screen === 'record' && (
-        <div className="space-y-5">
-          <button
-            type="button"
-            onClick={cancelDream}
-            className="inline-flex items-center gap-2 text-sm font-medium text-muted hover:text-ink"
-          >
-            <ArrowLeft className="w-4 h-4" strokeWidth={1.75} /> Close
-          </button>
-        <div className="rounded-3xl border border-line bg-cream shadow-lift p-5 sm:p-6">
-          <h2 className="font-serif text-2xl font-medium text-ink mb-1">Record last night</h2>
-          <p className="text-sm text-muted mb-6">Choose text, audio, or video capture — everything is optional and editable.</p>
+        <DreamCapture
+          onComplete={async (result, text) => {
+            // Build a complete dream object from the pipeline result
+            const analysis = result.analysis;
+            const imageAsset = result.image;
 
-          <div className="mb-5 grid grid-cols-3 gap-2">
-            {(['text', 'audio', 'video'] as const).map((mode) => (
-              <button
-                key={mode}
-                type="button"
-                onClick={() => setCaptureMode(mode)}
-                className={`rounded-2xl border px-3 py-2 text-sm font-medium transition ${
-                  captureMode === mode
-                    ? 'border-sage bg-sage text-cream shadow-paper'
-                    : 'border-line bg-parchment text-ink hover:bg-parchment/90'
-                }`}
-              >
-                {mode === 'text' ? 'Text' : mode === 'audio' ? 'Audio' : 'Video'}
-              </button>
-            ))}
-          </div>
+            const newDream = {
+              id: `dream-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+              date: new Date().toISOString(),
+              content: text,
+              category: analysis.category || 'uncategorized',
+              themes: analysis.themes || [],
+              emotion: analysis.emotion || 'neutral',
+              symbols: analysis.symbols || [],
+              narrative: analysis.narrative || text,
+              nugget: analysis.nugget || text.substring(0, 100),
+              interpretation: analysis.interpretation || {
+                symbols: {},
+                meaning: 'Analysis unavailable',
+                commonPattern: '',
+              },
+              moodValence: analysis.valence,
+              generatedImage: imageAsset
+                ? {
+                    url: imageAsset.url,
+                    prompt: imageAsset.prompt,
+                    style: imageAsset.style,
+                    generatedAt: imageAsset.generatedAt,
+                    source: imageAsset.source,
+                  }
+                : null,
+              captureMode: 'text',
+              isSample: false,
+            };
 
-          {/* Photo import shortcut */}
-          <button
-            type="button"
-            onClick={() => navigate('import-photos')}
-            className="mb-5 w-full border border-dashed border-sage/40 bg-sage/5 hover:bg-sage/10 rounded-2xl py-3.5 flex items-center justify-center gap-2.5 transition text-sm font-medium text-sageDark"
-          >
-            <Camera className="w-5 h-5" strokeWidth={1.75} />
-            Upload photos of journal pages
-          </button>
+            // Save to state
+            const updatedDreams = [newDream, ...dreams];
+            setDreams(updatedDreams);
+            await saveDreamsToStorage(updatedDreams);
 
-          {captureMode === 'video' && (
-            <div className="mb-5 rounded-3xl border border-line bg-parchment/80 p-4">
-              <div className="flex items-center justify-between gap-3 mb-4">
-                <div>
-                  <p className="text-sm font-semibold text-ink">Video capture</p>
-                  <p className="text-xs text-muted">Front camera + live transcription.</p>
-                </div>
-                <span className="text-[11px] uppercase tracking-[0.2em] text-muted">
-                  {isVideoRecording ? 'Recording…' : recordedVideoUrl ? 'Recorded' : 'Ready'}
-                </span>
-              </div>
-
-              {videoStream ? (
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  muted
-                  playsInline
-                  className="w-full aspect-video rounded-3xl bg-black object-cover"
-                />
-              ) : recordedVideoUrl ? (
-                <video
-                  controls
-                  src={recordedVideoUrl}
-                  className="w-full aspect-video rounded-3xl bg-black object-cover"
-                />
-              ) : (
-                <div className="rounded-3xl border border-dashed border-line bg-white/10 h-52 flex items-center justify-center text-sm text-muted">
-                  Front camera preview will appear here.
-                </div>
-              )}
-
-              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-                <button
-                  type="button"
-                  onClick={isVideoRecording ? stopVideoCapture : startVideoCapture}
-                  className={`w-full rounded-2xl py-3 text-sm font-semibold transition ${
-                    isVideoRecording
-                      ? 'bg-rose-600 text-cream hover:bg-rose-700'
-                      : 'bg-sage text-cream hover:bg-sageDark'
-                  }`}
-                >
-                  {isVideoRecording ? 'Stop recording' : 'Start video capture'}
-                </button>
-                {recordedVideoUrl && (
-                  <button
-                    type="button"
-                    onClick={clearVideoCapture}
-                    className="w-full rounded-2xl border border-line bg-parchment text-ink hover:bg-parchment/90 py-3 text-sm font-semibold"
-                  >
-                    Clear recorded clip
-                  </button>
-                )}
-              </div>
-
-              {/* Facial emotion detection during video capture */}
-              {videoStream && isVideoRecording && (
-                <div className="mt-3">
-                  <FacialEmotionDetector
-                    isActive={isVideoRecording && !!videoStream}
-                    onEmotionsCaptured={(emotions) => {
-                      setCapturedEmotions(emotions);
-                    }}
-                    width={320}
-                    height={240}
-                  />
-                </div>
-              )}
-
-              {/* Show captured emotions summary */}
-              {capturedEmotions && !isVideoRecording && (
-                <div className="mt-3 rounded-2xl border border-sage/20 bg-sage/5 px-3 py-2 flex items-center gap-2 text-sm">
-                  <span className="text-lg">
-                    {capturedEmotions.dominantEmotion === 'happy' ? '😊' :
-                     capturedEmotions.dominantEmotion === 'sad' ? '😢' :
-                     capturedEmotions.dominantEmotion === 'angry' ? '😠' :
-                     capturedEmotions.dominantEmotion === 'surprised' ? '😲' :
-                     capturedEmotions.dominantEmotion === 'fearful' ? '😰' :
-                     capturedEmotions.dominantEmotion === 'disgusted' ? '🤢' : '😐'}
-                  </span>
-                  <span className="text-sageDark font-medium">
-                    Detected: {capturedEmotions.dominantEmotion}
-                  </span>
-                  <span className="text-xs text-muted">
-                    ({Math.round((capturedEmotions.confidence || 0) * 100)}% confidence)
-                  </span>
-                </div>
-              )}
-            </div>
-          )}
-
-          {captureMode === 'audio' && (
-            <div className="mb-5 rounded-3xl border border-line bg-parchment/80 p-4 text-sm text-muted">
-              Record live audio or import an existing clip. Live transcription will appear while you speak.
-            </div>
-          )}
-
-          {captureMode === 'text' && (
-            <div className="mb-5 rounded-3xl border border-line bg-parchment/80 p-4 text-sm text-muted">
-              Type whatever comes to mind. Short phrases, images, or full scenes are all fine.
-            </div>
-          )}
-
-          <div className="mb-4 space-y-3">
-            <div>
-              <label className="text-xs uppercase tracking-wide text-muted mb-1 block">How did you feel before bed?</label>
-              <select
-                value={contextData.mood}
-                onChange={(e) => setContextData({...contextData, mood: e.target.value})}
-                className="w-full bg-parchment border border-line rounded-xl p-3 text-ink text-sm focus:outline-none focus:ring-2 focus:ring-sage/40"
-              >
-                <option value="">Select mood...</option>
-                <option value="peaceful">Peaceful 😌</option>
-                <option value="anxious">Anxious 😰</option>
-                <option value="excited">Excited 🤩</option>
-                <option value="tired">Tired 😴</option>
-                <option value="stressed">Stressed 😓</option>
-              </select>
-            </div>
-            
-            <div>
-              <label className="text-xs uppercase tracking-wide text-muted mb-1 block">What happened yesterday?</label>
-              <input
-                type="text"
-                placeholder="Work meeting, dinner with friends..."
-                value={contextData.yesterdayEvents}
-                onChange={(e) => setContextData({...contextData, yesterdayEvents: e.target.value})}
-                className="w-full bg-parchment border border-line rounded-xl p-3 text-ink placeholder:text-muted/70 text-sm focus:outline-none focus:ring-2 focus:ring-sage/40"
-              />
-            </div>
-          </div>
-
-          {pendingTranscription && (
-            <div className="mb-4 p-4 bg-parchment border border-sage/30 rounded-2xl">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-2 h-2 bg-sage rounded-full animate-pulse"></div>
-                <span className="text-sm text-ink font-medium">From file: {pendingTranscription.audioFile}</span>
-              </div>
-              <p className="text-xs text-muted">Edit the text below, then save to your journal.</p>
-            </div>
-          )}
-
-          {isTranscribing && (
-            <div className="mb-4 p-4 bg-parchment border border-line rounded-2xl">
-              <div className="flex items-center gap-3">
-                <div className="w-5 h-5 border-2 border-sage border-t-transparent rounded-full animate-spin"></div>
-                <div>
-                  <div className="text-sm font-semibold text-ink">Working on your audio…</div>
-                  <div className="text-xs text-muted">Usually just a few seconds</div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {isGeneratingImage && (
-            <div className="mb-4 p-4 bg-parchment border border-dusk/25 rounded-2xl">
-              <div className="flex items-center gap-3">
-                <div className="w-5 h-5 border-2 border-dusk border-t-transparent rounded-full animate-spin"></div>
-                <div>
-                  <div className="text-sm font-semibold text-ink">Painting a soft visualization…</div>
-                  <div className="text-xs text-muted">Optional — you can turn this off in Settings</div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <textarea
-            value={currentEntry}
-            onChange={(e) => setCurrentEntry(e.target.value)}
-            placeholder="Let the dream arrive in fragments or full scenes — there is no wrong way."
-            className="w-full min-h-[168px] bg-parchment border border-line rounded-2xl p-4 text-ink placeholder:text-muted/70 font-serif text-[15px] leading-relaxed focus:outline-none focus:ring-2 focus:ring-sage/40 resize-none mb-4"
-            disabled={isTranscribing || isGeneratingImage}
-          />
-
-          {recordedVideoUrl && !currentEntry.trim() && (
-            <div className="mb-4 rounded-2xl border border-line bg-yellow-50/90 px-4 py-3 text-sm text-ink">
-              Video captured successfully. Add a note or save now to keep the entry with the clip.
-            </div>
-          )}
-
-          <div className="grid grid-cols-2 gap-3 mb-4">
-            {!isRecording ? (
-              <button
-                type="button"
-                onClick={startSpeechRecording}
-                disabled={isTranscribing || isGeneratingImage}
-                className="border border-line bg-cream hover:bg-parchment disabled:opacity-45 py-3 rounded-xl flex items-center justify-center gap-2 transition text-sm font-medium text-ink"
-              >
-                <Mic className="w-5 h-5 text-rose-700/90" strokeWidth={1.75} />
-                Speak
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={stopSpeechRecording}
-                className="border border-rose-200 bg-rose-50 py-3 rounded-xl flex items-center justify-center gap-2 animate-pulse text-sm font-medium text-rose-900"
-              >
-                <div className="w-2.5 h-2.5 bg-rose-600 rounded-full animate-pulse" />
-                Listening…
-              </button>
-            )}
-            
-            <button
-              type="button"
-              onClick={() => document.getElementById('audioInput')?.click()}
-              disabled={isTranscribing || isRecording || isGeneratingImage}
-              className="border border-line bg-cream hover:bg-parchment disabled:opacity-45 py-3 rounded-xl flex items-center justify-center gap-2 transition text-sm font-medium"
-            >
-              {isTranscribing ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-sage border-t-transparent rounded-full animate-spin" />
-                  Processing…
-                </>
-              ) : (
-                <>
-                  <Upload className="w-5 h-5 text-muted" strokeWidth={1.75} />
-                  Import audio
-                </>
-              )}
-            </button>
-            <input
-              id="audioInput"
-              type="file"
-              accept="audio/*"
-              onChange={handleAudioImport}
-              className="hidden"
-            />
-          </div>
-
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={cancelDream}
-              className="flex-1 border border-line bg-parchment hover:bg-parchment/80 py-3 rounded-xl font-semibold transition text-sm text-ink"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={saveDream}
-              disabled={!(currentEntry.trim() || recordedVideoUrl) || isProcessing || isTranscribing || isGeneratingImage}
-              className="flex-1 bg-sage hover:bg-sageDark disabled:opacity-45 disabled:bg-muted py-3 rounded-xl font-semibold transition text-cream text-sm shadow-paper"
-            >
-              {isProcessing || isGeneratingImage ? (
-                <span className="flex items-center justify-center gap-2">
-                  <div className="w-4 h-4 border-2 border-cream border-t-transparent rounded-full animate-spin" />
-                  {isGeneratingImage ? 'Finishing…' : 'Reflecting…'}
-                </span>
-              ) : (
-                'Save to journal'
-              )}
-            </button>
-          </div>
-        </div>
-        </div>
+            // Navigate to the new dream detail
+            navigate('dream', newDream.id);
+          }}
+          onCancel={() => navigate('home')}
+        />
       )}
 
       {/* Photo import flow */}

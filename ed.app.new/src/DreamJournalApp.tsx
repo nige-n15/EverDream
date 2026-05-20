@@ -48,7 +48,7 @@ import type { DreamAsset } from './modules/sleep/types';
 
 const DreamJournalApp = () => {
   const { route, navigate } = useHashRoute();
-  const { isPearl } = useSkinFull();
+  const { isPearl, setSkin } = useSkinFull();
 
   // ── Dream type ──────────────────────────────────────────────
   type Dream = {

@@ -9,7 +9,7 @@
  *   VITE_SUPABASE_ANON_KEY  — Supabase anon/public key
  */
 
-import { supabase, type DreamRecord } from '../supabase/client';
+import { supabase, type DreamRecord } from './supabase/client';
 import type { PipelineResult } from './dreamPipeline';
 import type { DreamAnalysis } from './dream-analyzer';
 import type { DreamAsset } from '../modules/sleep/dreamAssetGenerator';

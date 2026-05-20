@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { Card } from './ui/Button';
-import { Badge } from './ui/Button';
+import { Card, Badge } from '../ui';
 
 interface SleepArticle {
   id: string;

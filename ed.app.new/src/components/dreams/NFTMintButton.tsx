@@ -57,7 +57,7 @@ export default function NFTMintButton({ dream, onMinted }: NFTMintButtonProps) {
           themes: dream.aiAnalysis?.themes || [],
           emotion: dream.mood || 'neutral',
           symbols: dream.aiAnalysis?.symbols || [],
-          narrative: dream.aiAnalysis?.interpretation?.meaning || dream.content,
+          narrative: dream.aiAnalysis?.interpretation || dream.content,
           nugget: dream.content.substring(0, 100),
           generatedImage: dream.imageUrl ? { url: dream.imageUrl } : undefined,
         },

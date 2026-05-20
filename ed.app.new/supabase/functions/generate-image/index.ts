@@ -90,12 +90,8 @@ async function generateWithPollinations(
   const seed = Date.now() % 1_000_000;
   const imageUrl = `${POLLINATIONS_BASE_URL}/${encodedPrompt}?width=${width}&height=${height}&nologo=true&seed=${seed}`;
 
-  // Validate the image URL is reachable
-  const headResponse = await fetch(imageUrl, { method: 'HEAD' });
-  if (!headResponse.ok) {
-    throw new Error(`Pollinations returned ${headResponse.status}`);
-  }
-
+  // Pollinations URLs are direct image links — no HEAD validation needed
+  // The browser will handle loading/errors naturally
   return {
     imageUrl,
     source: 'pollinations',

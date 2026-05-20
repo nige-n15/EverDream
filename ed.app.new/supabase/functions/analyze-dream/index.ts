@@ -126,32 +126,54 @@ async function analyzeWithOpenRouter(text: string): Promise<ProviderResult> {
   const apiKey = Deno.env.get('OPENROUTER_API_KEY');
   if (!apiKey) throw new Error('OPENROUTER_API_KEY not set');
 
-  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: 'openrouter/owl-alpha',
-      messages: [{
-        role: 'user',
-        content: ANALYSIS_PROMPT.replace('{DREAM_TEXT}', text),
-      }],
-      max_tokens: 2000,
-    }),
-  });
+  // Try multiple free models in order of preference
+  const models = [
+    'google/gemini-2.0-flash-exp:free',
+    'google/gemini-2.0-flash-thinking-exp:free',
+    'qwen/qwen-2-7b-instruct:free',
+    'openchat/openchat-7b:free',
+    'gryphe/mythomax-l2-13b:free',
+  ];
 
-  if (!response.ok) {
-    throw new Error(`OpenRouter returned ${response.status}`);
+  const errors: string[] = [];
+
+  for (const model of models) {
+    try {
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+          'HTTP-Referer': 'https://everdream.app',
+          'X-Title': 'EverDream',
+        },
+        body: JSON.stringify({
+          model,
+          messages: [{
+            role: 'user',
+            content: ANALYSIS_PROMPT.replace('{DREAM_TEXT}', text),
+          }],
+          max_tokens: 2000,
+        }),
+      });
+
+      if (!response.ok) {
+        errors.push(`${model}: ${response.status}`);
+        continue;
+      }
+
+      const data = await response.json();
+      const content = data.choices?.[0]?.message?.content || '{}';
+      const clean = content.replace(/```json|```/g, '').trim();
+      const analysis = JSON.parse(clean) as DreamAnalysis;
+
+      return { analysis, provider: 'openrouter', model };
+    } catch (err) {
+      errors.push(`${model}: ${err instanceof Error ? err.message : String(err)}`);
+    }
   }
 
-  const data = await response.json();
-  const content = data.choices?.[0]?.message?.content || '{}';
-  const clean = content.replace(/```json|```/g, '').trim();
-  const analysis = JSON.parse(clean) as DreamAnalysis;
-
-  return { analysis, provider: 'openrouter', model: 'owl-alpha' };
+  throw new Error(`All OpenRouter models failed: ${errors.join('; ')}`);
 }
 
 // ── Provider: Pollinations Text (Free, no key) ───────────────
@@ -180,7 +202,7 @@ async function analyzeWithGemini(text: string): Promise<ProviderResult> {
   const apiKey = Deno.env.get('GEMINI_API_KEY');
   if (!apiKey) throw new Error('GEMINI_API_KEY not set');
 
-  const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?${apiKey}`;
+  const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
   const response = await fetch(geminiUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

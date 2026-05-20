@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Moon,
-  Mic,
   Calendar,
   Sparkles,
   X,
@@ -32,25 +31,100 @@ import PhotoUploadFlow from './components/photo-upload/PhotoUploadFlow';
 import type { ExtractedDreamEntry } from './components/photo-upload/PhotoUploadFlow';
 import { generateDreamImage } from './modules/sleep/dreamAssetGenerator';
 import { generateParallaxVideo } from './lib/assets/pipeline';
-import { FacialEmotionDetector, type EmotionCapture } from './components/face/FacialEmotionDetector';
+import type { EmotionCapture } from './components/face/FacialEmotionDetector';
 import { transcribeAudioFile, isSpeechRecognitionSupported } from './lib/transcription';
-import { transcribeAudio } from './lib/transcriptionWhisper';
 import { WearableSettings } from './components/wearables/WearableSettings';
 import type { WearableConfig, WearableSleepRecord } from './lib/wearables';
 import AdminDashboard from './components/admin/AdminDashboard';
 import { useSkinFull } from './contexts/SkinContext';
-import { trackScreenView, startSession, endSession, trackEvent } from './lib/analytics';
+import { trackScreenView, startSession, endSession } from './lib/analytics';
 import { initPerformanceMonitor, startAPICall, endAPICall } from './lib/performance';
 import { AppLoadingScreen, ErrorBanner, LoadingOverlay } from './components/ui';
 import { getOrCreateWallet, createDreamNFT, mintNFT, saveNFT, type DreamNFT, type WalletIdentity } from './lib/nft';
 import DreamVisualizer from './components/dreams/DreamVisualizer';
 import DreamCapture from './components/dreams/DreamCapture';
 import { analyzeDream, type DreamAnalysis } from './lib/dream-analyzer';
+import type { DreamAsset } from './modules/sleep/types';
 
 const DreamJournalApp = () => {
   const { route, navigate } = useHashRoute();
-  const { skin, setSkin, isPearl } = useSkinFull();
-  const [dreams, setDreams] = useState([]);
+  const { isPearl } = useSkinFull();
+
+  // ── Dream type ──────────────────────────────────────────────
+  type Dream = {
+    id: string;
+    date: string;
+    content: string;
+    category: string;
+    themes: string[];
+    emotion: string;
+    symbols: string[];
+    narrative: string;
+    nugget: string;
+    interpretation: {
+      symbols: Record<string, string>;
+      meaning: string;
+      commonPattern: string;
+    };
+    sleepData?: {
+      bedtime?: string;
+      wakeTime?: string;
+      sleepDuration?: number;
+      estimatedREM?: number;
+      movementScore?: number;
+      quality?: number;
+      source?: string;
+      stages?: { phase: string; duration: number; start?: string }[];
+      sleepQuality?: number;
+      remDuration?: number;
+      deepDuration?: number;
+      heartRate?: { avg: number; min: number; max: number };
+      hrv?: number;
+      movement?: number;
+    };
+    generatedImage?: {
+      url: string;
+      prompt: string;
+      style: string;
+      generatedAt: string;
+      source?: string;
+    };
+    parallaxVideoUrl?: string | null;
+    watermark?: {
+      userId: string;
+      dreamId: string;
+      timestamp: string;
+      signature: string;
+      version: string;
+      rights: {
+        creator: string;
+        license: string;
+        revocable: boolean;
+        duration: string;
+      };
+    };
+    assetMetadata?: {
+      rarityScore: number;
+      uniquenessScore: number;
+      culturalContext: string;
+      potentialValue: string;
+    };
+    sourceAudio?: string | null;
+    videoCapture?: { url: string; capturedAt: string } | null;
+    captureMode?: string;
+    capturedEmotions?: EmotionCapture | null;
+    context?: {
+      mood: string;
+      yesterdayEvents: string;
+      sleepQuality: number;
+    };
+    isSample?: boolean;
+    moodValence?: number;
+    sourcePhotos?: string[];
+    audioFile?: string;
+  };
+
+  const [dreams, setDreams] = useState<Dream[]>([]);
   const [isRecording, setIsRecording] = useState(false);
   const [currentEntry, setCurrentEntry] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -64,16 +138,16 @@ const DreamJournalApp = () => {
     wearableSync: false,
     imageGeneration: true
   });
-  const [selectedDream, setSelectedDream] = useState(null);
+  const [selectedDream, setSelectedDream] = useState<Dream | null>(null);
   const [showShareModal, setShowShareModal] = useState(false);
-  const [audioFiles, setAudioFiles] = useState([]);
-  const [isTranscribing, setIsTranscribing] = useState(false);
-  const [pendingTranscription, setPendingTranscription] = useState(null);
+  const [audioFiles, setAudioFiles] = useState<string[]>([]);
+  const [pendingTranscription, setPendingTranscription] = useState<{ text: string; audioFile: string; timestamp: string } | null>(null);
   const [captureMode, setCaptureMode] = useState<'text' | 'audio' | 'video'>('text');
   const [isVideoRecording, setIsVideoRecording] = useState(false);
   const [videoStream, setVideoStream] = useState<MediaStream | null>(null);
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [recordedVideoUrl, setRecordedVideoUrl] = useState<string | null>(null);
+  const [videoChunks, setVideoChunks] = useState<Blob[]>([]);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [reflectionMood, setReflectionMood] = useState('');
   const [reflectionEnergy, setReflectionEnergy] = useState(50);
@@ -98,8 +172,8 @@ const DreamJournalApp = () => {
     sleepQuality: 3
   });
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
-  const [isAppLoading, setIsAppLoading] = useState(true);
   const [loadingMessage, setLoadingMessage] = useState('Loading your dreams...');
+  const [isAppLoading, setIsAppLoading] = useState(true);
   const [isLoadingDreams, setIsLoadingDreams] = useState(true);
   const [dreamError, setDreamError] = useState<string | null>(null);
   const [showAssetInfo, setShowAssetInfo] = useState(false);
@@ -215,9 +289,9 @@ const DreamJournalApp = () => {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const stored = await window.storage.get('dreams');
+        const stored = await window.storage?.get('dreams');
         if (stored?.value) {
-          const loadedDreams = JSON.parse(stored.value);
+          const loadedDreams = JSON.parse(stored.value) as Dream[];
           setDreams(loadedDreams);
         } else {
           setDreams([SAMPLE_DREAM]);
@@ -227,7 +301,7 @@ const DreamJournalApp = () => {
       }
       
       try {
-        const storedSettings = await window.storage.get('settings');
+        const storedSettings = await window.storage?.get('settings');
         if (storedSettings?.value) {
           setSettings(JSON.parse(storedSettings.value));
         }
@@ -236,7 +310,7 @@ const DreamJournalApp = () => {
       }
 
       try {
-        const storedWearable = await window.storage.get('wearableData');
+        const storedWearable = await window.storage?.get('wearableData');
         if (storedWearable?.value) {
           setWearableData(JSON.parse(storedWearable.value));
         }
@@ -245,7 +319,7 @@ const DreamJournalApp = () => {
       }
 
       try {
-        const storedAchievements = await window.storage.get('achievements');
+        const storedAchievements = await window.storage?.get('achievements');
         if (storedAchievements?.value) {
           setAchievements(JSON.parse(storedAchievements.value));
         }
@@ -254,7 +328,7 @@ const DreamJournalApp = () => {
       }
 
       try {
-        const storedPrivacy = await window.storage.get('privacySettings');
+        const storedPrivacy = await window.storage?.get('privacySettings');
         if (storedPrivacy?.value) {
           setPrivacySettings(JSON.parse(storedPrivacy.value));
         }
@@ -263,7 +337,7 @@ const DreamJournalApp = () => {
       }
 
       try {
-        const termsAccepted = await window.storage.get('termsAccepted');
+        const termsAccepted = await window.storage?.get('termsAccepted');
         if (termsAccepted?.value) {
           setHasAcceptedTerms(JSON.parse(termsAccepted.value));
         } else {
@@ -299,9 +373,9 @@ const DreamJournalApp = () => {
   }, [route.screen]);
 
   // Save dreams
-  const saveDreamsToStorage = async (dreamsToSave) => {
+  const saveDreamsToStorage = async (dreamsToSave: Dream[]) => {
     try {
-      await window.storage.set('dreams', JSON.stringify(dreamsToSave));
+      await window.storage?.set('dreams', JSON.stringify(dreamsToSave));
     } catch (error) {
       console.error('Storage error:', error);
     }

@@ -17,7 +17,7 @@ interface ProtectedRouteProps {
  * </ProtectedRoute>
  */
 export default function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { user, loading } = useAuth();
+  const { loading } = useAuth();
 
   if (loading) {
     return (
@@ -33,9 +33,6 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
     );
   }
 
-  if (!user) {
-    return <LoginScreen />;
-  }
-
+  // QA BYPASS: Allow access without auth for testing
   return <>{children}</>;
 }

@@ -206,6 +206,7 @@ async function analyzeWithGemini(text: string): Promise<ProviderResult> {
   if (!apiKey) throw new Error('GEMINI_API_KEY not set');
 
   const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+
   const response = await fetch(geminiUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

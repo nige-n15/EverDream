@@ -369,7 +369,7 @@ export async function localDeleteDream(id: string): Promise<void> {
 }
 
 // ============================================================
--- SLEEP SESSION OPERATIONS
+// SLEEP SESSION OPERATIONS
 // ============================================================
 
 export async function localSaveSleepSession(session: Partial<LocalSleepSession>): Promise<LocalSleepSession> {
@@ -531,7 +531,7 @@ export async function localGetSetting<T = unknown>(key: string): Promise<T | nul
 }
 
 // ============================================================
--- 35-DAY RETENTION CLEANUP
+// 35-DAY RETENTION CLEANUP
 // ============================================================
 
 export async function cleanupExpiredRecords(): Promise<{ dreams: number; sleepSessions: number }> {
@@ -559,7 +559,7 @@ export async function cleanupExpiredRecords(): Promise<{ dreams: number; sleepSe
 }
 
 // ============================================================
--- STORAGE STATS
+// STORAGE STATS
 // ============================================================
 
 export async function getStorageStats(): Promise<{
@@ -579,7 +579,7 @@ export async function getStorageStats(): Promise<{
 }
 
 // ============================================================
--- MIGRATION: localStorage -> IndexedDB (one-time)
+// MIGRATION: localStorage -> IndexedDB (one-time)
 // ============================================================
 
 export async function migrateFromLocalStorage(): Promise<{ migrated: number; errors: number }> {

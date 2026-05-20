@@ -12,6 +12,7 @@ export interface Dream {
   category: string;
   date: string;
   imageUrl?: string;
+  nugget?: string;
   aiAnalysis?: {
     symbols: string[];
     themes: string[];

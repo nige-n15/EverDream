@@ -457,103 +457,25 @@ const DreamJournalApp = () => {
     };
   };
 
-  // AI Analysis with image generation
-  const analyzeDream = async (text) => {
+  // AI Analysis with image generation — uses dream-analyzer module (edge function + fallback)
+  const runDreamAnalysis = async (text: string) => {
     setIsProcessing(true);
-    const perfCall = startAPICall('anthropic', '/v1/messages', 'POST', route.screen);
+    const perfCall = startAPICall('dream-analyzer', 'analyze-dream', 'POST', route.screen);
     try {
-      const anthropicKey = import.meta.env.VITE_ANTHROPIC_API_KEY || '';
-      if (!anthropicKey) {
-        console.warn('[analyzeDream] VITE_ANTHROPIC_API_KEY not set — returning fallback');
-        return {
-          category: 'uncategorized',
-          themes: ['dream', 'experience'],
-          emotion: 'neutral',
-          symbols: [],
-          narrative: text,
-          nugget: text.substring(0, 100) + '...',
-          interpretation: {
-            symbols: {},
-            meaning: 'Analysis unavailable — configure VITE_ANTHROPIC_API_KEY',
-            commonPattern: ''
-          }
-        };
-      }
-
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": anthropicKey,
-          "anthropic-version": "2023-06-01",
-          "anthropic-dangerous-direct-browser-access": "true",
-        },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 2000,
-          messages: [{
-            role: "user",
-            content: `Analyze this dream and provide detailed response in JSON format:
-{
-  "category": "nightmare/lucid/recurring/peaceful/prophetic/anxiety/adventure",
-  "themes": ["theme1", "theme2", "theme3"],
-  "emotion": "primary emotional tone",
-  "symbols": ["symbol1", "symbol2", "symbol3"],
-  "narrative": "expanded 200-word vivid narrative in first person present tense",
-  "nugget": "one captivating sentence (15-20 words)",
-  "interpretation": {
-    "symbols": {
-      "symbol1": "what it represents",
-      "symbol2": "what it represents"
-    },
-    "meaning": "psychological insight about what this dream reveals",
-    "commonPattern": "when people typically have dreams like this"
-  }
-}
-
-Dream: ${text}
-
-Respond ONLY with valid JSON, no markdown.`
-          }],
-        })
-      });
-
-      endAPICall(perfCall, response.status);
-
-      if (!response.ok) {
-        const errText = await response.text();
-        console.error('[analyzeDream] Anthropic API error:', response.status, errText);
-        return {
-          category: 'uncategorized',
-          themes: ['dream', 'experience'],
-          emotion: 'neutral',
-          symbols: [],
-          narrative: text,
-          nugget: text.substring(0, 100) + '...',
-          interpretation: {
-            symbols: {},
-            meaning: `Analysis unavailable (API error ${response.status})`,
-            commonPattern: ''
-          }
-        };
-      }
-
-      const data = await response.json();
-      const analysisText = data.content?.find(c => c.type === 'text')?.text || '{}';
-      const cleanText = analysisText.replace(/```json|```/g, '').trim();
-      const parsed = JSON.parse(cleanText);
-      console.info('[analyzeDream] Analysis complete:', parsed.category, parsed.themes?.join(','));
-      return parsed;
+      const result = await analyzeDream(text);
+      endAPICall(perfCall, 200);
+      return result;
     } catch (error) {
       endAPICall(perfCall, 0, String(error));
-      console.error('[analyzeDream] AI analysis error:', error);
+      console.error('[runDreamAnalysis] Analysis error:', error);
       return {
         category: 'uncategorized',
         themes: ['dream', 'experience'],
         emotion: 'neutral',
         symbols: [],
         narrative: text,
-        nugget: text.substring(0, 100) + '...',
+        nugget: text.substring(0, 100),
+        valence: 0,
         interpretation: {
           symbols: {},
           meaning: 'Analysis unavailable',
@@ -907,7 +829,7 @@ Respond ONLY with valid JSON, no markdown.`
     if (!captureText) return;
 
     // Step 1: AI Analysis
-    const analysis = await analyzeDream(captureText);
+    const analysis = await runDreamAnalysis(captureText);
 
     // Step 2: Generate Image (if enabled) — FREE via Pollinations
     let generatedImage = null;

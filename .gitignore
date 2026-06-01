@@ -5,24 +5,22 @@ node_modules/
 # Build outputs
 dist/
 build/
-.next/
-out/
+*.js.map
+*.tsbuildinfo
 
-# Environment variables
+# Environment
 .env
 .env.local
 .env.*
 
-# IDE specific
+# Editors
 .vscode/
 .idea/
-*.swp
-*.swo
 
 # Logs
 *.log
 
-# Python related
+# Python
 __pycache__/
 *.pyc
 *.pyo
@@ -33,18 +31,17 @@ venv/
 .venv/
 pip-log.txt
 pip-delete-this-directory.txt
-
-# Coverage reports
-coverage/
-htmlcov/
+.pytest_cache/
 .coverage
-
-# Temporary files
-*.tmp
-*.temp
-.DS_Store
-Thumbs.db
-
-# MyPy cache
+htmlcov/
 .mypy_cache/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 ```

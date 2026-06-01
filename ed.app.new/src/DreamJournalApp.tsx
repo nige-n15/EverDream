@@ -111,7 +111,7 @@ const DreamJournalApp = () => {
       potentialValue: string;
     };
     sourceAudio?: string | null;
-    videoCapture?: { url: string; capturedAt: string } | null;
+    videoCapture?: { url: string; capturedAt: string; duration?: number } | null;
     captureMode?: string;
     capturedEmotions?: EmotionCapture | null;
     context?: {
@@ -149,6 +149,7 @@ const DreamJournalApp = () => {
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [recordedVideoUrl, setRecordedVideoUrl] = useState<string | null>(null);
   const [videoChunks, setVideoChunks] = useState<Blob[]>([]);
+  const [videoDuration, setVideoDuration] = useState<number>(0);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [reflectionMood, setReflectionMood] = useState('');
   const [reflectionEnergy, setReflectionEnergy] = useState(50);
@@ -563,6 +564,7 @@ const DreamJournalApp = () => {
         mimeType: 'video/webm;codecs=vp8,opus',
       });
       const chunks: Blob[] = [];
+      let recordingStartTime = Date.now();
       console.log('[VideoCapture] MediaRecorder created with mime type:', recorder.mimeType);
 
       recorder.ondataavailable = (event) => {
@@ -578,13 +580,15 @@ const DreamJournalApp = () => {
         console.log('[VideoCapture] Video blob created:', blob.size, 'bytes');
         const url = URL.createObjectURL(blob);
         console.log('[VideoCapture] Object URL created:', url.substring(0, 50));
+        const duration = Math.floor((Date.now() - recordingStartTime) / 1000);
+        setVideoDuration(duration);
         setRecordedVideoUrl(url);
         setVideoChunks(chunks);
         setIsVideoRecording(false);
         stream.getTracks().forEach((track) => track.stop());
         setVideoStream(null);
         setMediaRecorder(null);
-        console.log('[VideoCapture] Cleanup complete');
+        console.log('[VideoCapture] Cleanup complete, duration:', duration, 'seconds');
       };
 
       recorder.start();
@@ -592,6 +596,7 @@ const DreamJournalApp = () => {
       setIsVideoRecording(true);
       setVideoChunks([]);
       setRecordedVideoUrl(null);
+      setVideoDuration(0);
       console.log('[VideoCapture] Recording started');
       startSpeechRecording();
     } catch (error) {
@@ -919,7 +924,7 @@ const DreamJournalApp = () => {
       watermark,
       assetMetadata: calculateAssetMetadata(analysis),
       sourceAudio: pendingTranscription?.audioFile || null,
-      videoCapture: recordedVideoUrl ? { url: recordedVideoUrl, capturedAt: new Date().toISOString() } : null,
+      videoCapture: recordedVideoUrl ? { url: recordedVideoUrl, capturedAt: new Date().toISOString(), duration: videoDuration } : null,
       captureMode,
       capturedEmotions: capturedEmotions || null,
       context: contextData

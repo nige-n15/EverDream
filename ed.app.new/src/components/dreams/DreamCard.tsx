@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sparkles, Share2 } from 'lucide-react';
+import { Sparkles, Share2, Video } from 'lucide-react';
 import { getEmotionEmoji } from '../../utils/dreamPresentation';
 
 export interface DreamCardProps {
@@ -12,6 +12,7 @@ export interface DreamCardProps {
     themes?: string[];
     nugget?: string;
     generatedImage?: { url: string } | null;
+    videoCapture?: { url: string; duration?: number } | null;
     assetMetadata?: { rarityScore?: number };
     isSample?: boolean;
   };
@@ -63,6 +64,40 @@ export function DreamCard({ dream, getCategoryBadgeClass, getEmotionEmoji: getEm
         e.currentTarget.style.boxShadow = 'var(--glass-shadow, 0 1px 6px rgba(168,237,220,0.10))';
       }}
     >
+      {/* Video Thumbnail or Generated Image */}
+      {dream.videoCapture?.url ? (
+        <div style={{ position: 'relative', marginBottom: '12px', borderRadius: '12px', overflow: 'hidden' }}>
+          <video
+            src={dream.videoCapture.url}
+            style={{ width: '100%', height: '180px', objectFit: 'cover', display: 'block' }}
+            muted
+            preload="metadata"
+          />
+          <div style={{
+            position: 'absolute',
+            bottom: '8px',
+            right: '8px',
+            background: 'rgba(0,0,0,0.7)',
+            borderRadius: '6px',
+            padding: '4px 8px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+          }}>
+            <Video size={12} color="#fff" />
+            <span style={{ fontSize: '0.7rem', color: '#fff', fontWeight: 600 }}>
+              {dream.videoCapture.duration ? `${dream.videoCapture.duration}s` : 'Video'}
+            </span>
+          </div>
+        </div>
+      ) : dream.generatedImage ? (
+        <img 
+          src={dream.generatedImage.url} 
+          alt="Dream visualization"
+          style={{ width: '100%', height: '180px', objectFit: 'cover', borderRadius: '12px', marginBottom: '12px' }}
+        />
+      ) : null}
+
       {/* Header Row */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

@@ -8,7 +8,7 @@ import {
   X,
   Sparkles,
 } from 'lucide-react';
-import { EmojiWheel, MOOD_WHEEL_6, type MoodOption } from '../mood/EmojiWheel';
+import { EmojiWheel, type MoodState } from '../mood/EmojiWheel';
 import { addMoodEntry, type MoodEntry } from '../mood/EmojiWheel';
 import { getABTestVariant, trackABTestConversion, trackEvent } from '../../lib/analytics';
 
@@ -38,8 +38,7 @@ export function MorningFlow({
   quote,
 }: MorningFlowProps) {
   const [step, setStep] = useState<'greeting' | 'mood' | 'dream_prompt' | 'complete'>('greeting');
-  const [selectedMood, setSelectedMood] = useState<string | null>(null);
-  const [intensity, setIntensity] = useState(3);
+  const [selectedMood, setSelectedMood] = useState<MoodState | null>(null);
   const [variant, setVariant] = useState<MorningVariant>('mood_first');
 
   // Determine A/B test variant on mount
@@ -86,24 +85,31 @@ export function MorningFlow({
     }
   }, [variant]);
 
-  const handleMoodSelect = (moodId: string, newIntensity: number) => {
-    setSelectedMood(moodId);
-    setIntensity(newIntensity);
+  const handleMoodSelect = (mood: MoodState) => {
+    setSelectedMood(mood);
   };
 
   const handleMoodSubmit = () => {
     if (!selectedMood) return;
 
     const entry: Omit<MoodEntry, 'id'> = {
-      moodId: selectedMood,
-      intensity,
+      valence: selectedMood.valence,
+      energy: selectedMood.energy,
+      emoji: selectedMood.emoji,
+      label: selectedMood.label,
+      intensity: selectedMood.intensity,
       timestamp: Date.now(),
       context: 'morning',
     };
     addMoodEntry(entry);
-    trackEvent('custom', 'mood_logged', { mood: selectedMood, intensity });
+    trackEvent('custom', 'mood_logged', { 
+      mood: selectedMood.label, 
+      valence: selectedMood.valence,
+      energy: selectedMood.energy,
+      intensity: selectedMood.intensity 
+    });
 
-    onMoodOnly(selectedMood, intensity);
+    onMoodOnly(selectedMood.label, selectedMood.intensity);
 
     // After mood, prompt for dream
     setStep('dream_prompt');
@@ -174,16 +180,15 @@ export function MorningFlow({
               <p className="text-sm text-muted">
                 {variant === 'dream_first'
                   ? 'Quick mood check-in'
-                  : 'Tap an emoji, pinch to adjust intensity'}
+                  : 'Drag to find your mood on the wheel'}
               </p>
             </div>
 
             <EmojiWheel
-              options={MOOD_WHEEL_6}
               value={selectedMood}
-              intensity={intensity}
               onChange={handleMoodSelect}
               size="md"
+              showAxes={true}
               showLabels={true}
             />
 

@@ -22,6 +22,8 @@ import {
   type GuidedMeditation,
   type AmbientSound,
 } from '../../lib/sleepEducation';
+import { EmojiWheel, type MoodState } from '../mood/EmojiWheel';
+import { addMoodEntry, type MoodEntry } from '../mood/EmojiWheel';
 
 // ============================================================
 // AMBIENT AUDIO PLAYER (Web Audio API - no external files needed)
@@ -255,8 +257,7 @@ type WindDownStep = 'mood' | 'education' | 'meditation' | 'ambient' | 'ready';
 
 export function WindDownFlow({ onClose, onMoodLogged, circadianProfile }: WindDownFlowProps) {
   const [step, setStep] = useState<WindDownStep>('mood');
-  const [selectedMood, setSelectedMood] = useState<string | null>(null);
-  const [energy, setEnergy] = useState(50);
+  const [selectedMood, setSelectedMood] = useState<MoodState | null>(null);
   const [selectedSound, setSelectedSound] = useState<AmbientSound | null>(null);
   const [soundPlaying, setSoundPlaying] = useState(false);
   const [volume, setVolume] = useState(0.5);
@@ -264,18 +265,21 @@ export function WindDownFlow({ onClose, onMoodLogged, circadianProfile }: WindDo
   const [meditationPlaying, setMeditationPlaying] = useState(false);
   const [currentScriptIndex, setCurrentScriptIndex] = useState(0);
 
-  const moods = [
-    { id: 'anxious', emoji: '😰', label: 'Anxious', color: 'bg-amber-100 border-amber-300 text-amber-800' },
-    { id: 'excited', emoji: '🤩', label: 'Excited', color: 'bg-pink-100 border-pink-300 text-pink-800' },
-    { id: 'tired', emoji: '😴', label: 'Tired', color: 'bg-blue-100 border-blue-300 text-blue-800' },
-    { id: 'calm', emoji: '😌', label: 'Calm', color: 'bg-green-100 border-green-300 text-green-800' },
-    { id: 'restless', emoji: '🥱', label: 'Restless', color: 'bg-orange-100 border-orange-300 text-orange-800' },
-    { id: 'peaceful', emoji: '✨', label: 'Peaceful', color: 'bg-violet-100 border-violet-300 text-violet-800' },
-  ];
-
   const handleMoodSubmit = () => {
     if (selectedMood) {
-      onMoodLogged(selectedMood, energy);
+      // Save to mood history
+      const entry: Omit<MoodEntry, 'id'> = {
+        valence: selectedMood.valence,
+        energy: selectedMood.energy,
+        emoji: selectedMood.emoji,
+        label: selectedMood.label,
+        intensity: selectedMood.intensity,
+        timestamp: Date.now(),
+        context: 'wind_down',
+      };
+      addMoodEntry(entry);
+      
+      onMoodLogged(selectedMood.label, selectedMood.energy);
       setStep('education');
     }
   };
@@ -320,38 +324,13 @@ export function WindDownFlow({ onClose, onMoodLogged, circadianProfile }: WindDo
               </p>
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
-              {moods.map((mood) => (
-                <button
-                  key={mood.id}
-                  type="button"
-                  onClick={() => setSelectedMood(mood.id)}
-                  className={`rounded-2xl border-2 p-4 text-center transition ${
-                    selectedMood === mood.id
-                      ? mood.color + ' scale-105 shadow-lg'
-                      : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10'
-                  }`}
-                >
-                  <span className="text-3xl block mb-1">{mood.emoji}</span>
-                  <span className="text-xs font-medium">{mood.label}</span>
-                </button>
-              ))}
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-white/50">Energy level</span>
-                <span className="text-white/70">{energy}%</span>
-              </div>
-              <input
-                type="range"
-                min={0}
-                max={100}
-                value={energy}
-                onChange={(e) => setEnergy(parseInt(e.target.value))}
-                className="w-full accent-sage"
-              />
-            </div>
+            <EmojiWheel
+              value={selectedMood}
+              onChange={setSelectedMood}
+              size="md"
+              showAxes={true}
+              showLabels={true}
+            />
 
             <button
               type="button"

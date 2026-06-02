@@ -1,273 +1,348 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 
 /**
- * Emoji Mood Wheel
+ * Emoji Mood Wheel - XY Axis Model
  * 
- * Supports 6, 8, or 12 emoji options (configurable).
- * Basic valence (positive/negative/neutral) by default.
- * Expanded wheel in settings (premium).
- * Pinch-to-resize intensity.
+ * 2-axis emotional mapping:
+ * - Y axis: Negative (bottom) to Positive (top) — valence (-1 to 1)
+ * - X axis: Low energy (left) to High energy (right) — arousal (-1 to 1)
+ * - Distance from center: Intensity (closer = calm, farther = intense)
+ * 
+ * Maps XY position to emojis based on quadrant and intensity
  */
 
-export interface MoodOption {
-  id: string;
+export interface MoodState {
+  valence: number;    // -1 (negative) to 1 (positive)
+  energy: number;     // -1 (low energy) to 1 (high energy)
   emoji: string;
   label: string;
-  valence: 'positive' | 'negative' | 'neutral';
-  intensity: number;  // 1-5, how strong the emotion is
-  color: string;      // Tailwind bg color
+  intensity: number;  // 0 (calm) to 1 (intense) - derived from distance
 }
 
-// Default 6-option wheel (basic)
-export const MOOD_WHEEL_6: MoodOption[] = [
-  { id: 'happy', emoji: '😊', label: 'Happy', valence: 'positive', intensity: 3, color: 'bg-green-400' },
-  { id: 'calm', emoji: '😌', label: 'Calm', valence: 'positive', intensity: 2, color: 'bg-blue-400' },
-  { id: 'neutral', emoji: '😐', label: 'Neutral', valence: 'neutral', intensity: 1, color: 'bg-gray-400' },
-  { id: 'tired', emoji: '😴', label: 'Tired', valence: 'neutral', intensity: 2, color: 'bg-indigo-400' },
-  { id: 'anxious', emoji: '😰', label: 'Anxious', valence: 'negative', intensity: 3, color: 'bg-amber-400' },
-  { id: 'sad', emoji: '😢', label: 'Sad', valence: 'negative', intensity: 4, color: 'bg-blue-500' },
+// Emoji lookup table based on valence and energy quadrants
+const EMOJI_MAP: Array<{
+  valenceRange: [number, number];
+  energyRange: [number, number];
+  emoji: string;
+  label: string;
+  baseIntensity: number;
+}> = [
+  // Top-right: Positive + High Energy
+  { valenceRange: [0.3, 1], energyRange: [0.3, 1], emoji: '🤩', label: 'Ecstatic', baseIntensity: 0.9 },
+  { valenceRange: [0.3, 1], energyRange: [0.1, 0.3], emoji: '😄', label: 'Excited', baseIntensity: 0.7 },
+  { valenceRange: [0.1, 0.3], energyRange: [0.3, 1], emoji: '😊', label: 'Happy', baseIntensity: 0.6 },
+  { valenceRange: [0.1, 0.3], energyRange: [0.1, 0.3], emoji: '🙂', label: 'Content', baseIntensity: 0.4 },
+  
+  // Top-left: Positive + Low Energy
+  { valenceRange: [0.3, 1], energyRange: [-0.3, 0.1], emoji: '😌', label: 'Peaceful', baseIntensity: 0.5 },
+  { valenceRange: [0.3, 1], energyRange: [-1, -0.3], emoji: '😴', label: 'Sleepy', baseIntensity: 0.7 },
+  { valenceRange: [0.1, 0.3], energyRange: [-0.3, 0.1], emoji: '😌', label: 'Calm', baseIntensity: 0.4 },
+  { valenceRange: [0.1, 0.3], energyRange: [-1, -0.3], emoji: '🥱', label: 'Relaxed', baseIntensity: 0.5 },
+  
+  // Center: Neutral
+  { valenceRange: [-0.1, 0.1], energyRange: [-0.1, 0.1], emoji: '😐', label: 'Neutral', baseIntensity: 0.2 },
+  { valenceRange: [-0.1, 0.1], energyRange: [0.1, 0.5], emoji: '🤔', label: 'Thoughtful', baseIntensity: 0.3 },
+  { valenceRange: [-0.1, 0.1], energyRange: [-0.5, -0.1], emoji: '😶', label: 'Quiet', baseIntensity: 0.3 },
+  
+  // Bottom-right: Negative + High Energy
+  { valenceRange: [-0.3, -0.1], energyRange: [0.3, 1], emoji: '😤', label: 'Frustrated', baseIntensity: 0.7 },
+  { valenceRange: [-1, -0.3], energyRange: [0.3, 1], emoji: '😠', label: 'Angry', baseIntensity: 0.9 },
+  { valenceRange: [-0.3, -0.1], energyRange: [0.1, 0.3], emoji: '😰', label: 'Anxious', baseIntensity: 0.6 },
+  { valenceRange: [-1, -0.3], energyRange: [0.1, 0.3], emoji: '😨', label: 'Stressed', baseIntensity: 0.8 },
+  
+  // Bottom-left: Negative + Low Energy
+  { valenceRange: [-0.3, -0.1], energyRange: [-0.3, 0.1], emoji: '😔', label: 'Down', baseIntensity: 0.5 },
+  { valenceRange: [-1, -0.3], energyRange: [-0.3, 0.1], emoji: '😢', label: 'Sad', baseIntensity: 0.7 },
+  { valenceRange: [-0.3, -0.1], energyRange: [-1, -0.3], emoji: '😞', label: 'Disappointed', baseIntensity: 0.5 },
+  { valenceRange: [-1, -0.3], energyRange: [-1, -0.3], emoji: '😭', label: 'Depressed', baseIntensity: 0.8 },
 ];
 
-// Expanded 8-option wheel
-export const MOOD_WHEEL_8: MoodOption[] = [
-  { id: 'ecstatic', emoji: '🤩', label: 'Ecstatic', valence: 'positive', intensity: 5, color: 'bg-yellow-400' },
-  { id: 'happy', emoji: '😊', label: 'Happy', valence: 'positive', intensity: 3, color: 'bg-green-400' },
-  { id: 'calm', emoji: '😌', label: 'Calm', valence: 'positive', intensity: 2, color: 'bg-teal-400' },
-  { id: 'peaceful', emoji: '✨', label: 'Peaceful', valence: 'positive', intensity: 2, color: 'bg-violet-400' },
-  { id: 'neutral', emoji: '😐', label: 'Neutral', valence: 'neutral', intensity: 1, color: 'bg-gray-400' },
-  { id: 'tired', emoji: '😴', label: 'Tired', valence: 'neutral', intensity: 2, color: 'bg-indigo-400' },
-  { id: 'anxious', emoji: '😰', label: 'Anxious', valence: 'negative', intensity: 3, color: 'bg-amber-400' },
-  { id: 'sad', emoji: '😢', label: 'Sad', valence: 'negative', intensity: 4, color: 'bg-blue-500' },
-];
+// Helper function to get emoji from valence and energy
+export function getEmojiForPosition(valence: number, energy: number): { emoji: string; label: string; intensity: number } {
+  // Calculate intensity from distance from center
+  const intensity = Math.sqrt(valence * valence + energy * energy);
+  
+  // Find matching emoji region
+  for (const region of EMOJI_MAP) {
+    const [vMin, vMax] = region.valenceRange;
+    const [eMin, eMax] = region.energyRange;
+    
+    if (valence >= vMin && valence <= vMax && energy >= eMin && energy <= eMax) {
+      return {
+        emoji: region.emoji,
+        label: region.label,
+        intensity: Math.max(0, Math.min(1, intensity)),
+      };
+    }
+  }
+  
+  // Default fallback based on quadrant
+  if (valence > 0 && energy > 0) return { emoji: '😊', label: 'Happy', intensity };
+  if (valence > 0 && energy < 0) return { emoji: '😌', label: 'Calm', intensity };
+  if (valence < 0 && energy > 0) return { emoji: '😠', label: 'Agitated', intensity };
+  if (valence < 0 && energy < 0) return { emoji: '😢', label: 'Sad', intensity };
+  return { emoji: '😐', label: 'Neutral', intensity };
+}
 
-// Full 12-option wheel (premium)
-export const MOOD_WHEEL_12: MoodOption[] = [
-  { id: 'ecstatic', emoji: '🤩', label: 'Ecstatic', valence: 'positive', intensity: 5, color: 'bg-yellow-400' },
-  { id: 'joyful', emoji: '😄', label: 'Joyful', valence: 'positive', intensity: 4, color: 'bg-green-400' },
-  { id: 'grateful', emoji: '🙏', label: 'Grateful', valence: 'positive', intensity: 3, color: 'bg-emerald-400' },
-  { id: 'calm', emoji: '😌', label: 'Calm', valence: 'positive', intensity: 2, color: 'bg-teal-400' },
-  { id: 'peaceful', emoji: '✨', label: 'Peaceful', valence: 'positive', intensity: 2, color: 'bg-violet-400' },
-  { id: 'curious', emoji: '🤔', label: 'Curious', valence: 'neutral', intensity: 2, color: 'bg-cyan-400' },
-  { id: 'neutral', emoji: '😐', label: 'Neutral', valence: 'neutral', intensity: 1, color: 'bg-gray-400' },
-  { id: 'tired', emoji: '😴', label: 'Tired', valence: 'neutral', intensity: 2, color: 'bg-indigo-400' },
-  { id: 'restless', emoji: '🥱', label: 'Restless', valence: 'negative', intensity: 2, color: 'bg-orange-400' },
-  { id: 'anxious', emoji: '😰', label: 'Anxious', valence: 'negative', intensity: 3, color: 'bg-amber-500' },
-  { id: 'sad', emoji: '😢', label: 'Sad', valence: 'negative', intensity: 4, color: 'bg-blue-500' },
-  { id: 'angry', emoji: '😠', label: 'Angry', valence: 'negative', intensity: 5, color: 'bg-red-500' },
-];
+// Convert XY coordinates to angle for visual placement
+function xyToAngle(x: number, y: number): number {
+  return Math.atan2(y, x);
+}
 
-interface EmojiWheelProps {
-  options: MoodOption[];
-  value: string | null;
-  intensity?: number;
-  onChange: (moodId: string, intensity: number) => void;
+// Convert polar to XY for rendering
+function polarToXY(angle: number, radius: number): { x: number; y: number } {
+  return {
+    x: Math.cos(angle) * radius,
+    y: Math.sin(angle) * radius,
+  };
+}
+
+interface MoodWheelProps {
+  value: MoodState | null;
+  onChange: (mood: MoodState) => void;
   size?: 'sm' | 'md' | 'lg';
+  showAxes?: boolean;
   showLabels?: boolean;
   interactive?: boolean;
 }
 
 export function EmojiWheel({
-  options,
   value,
-  intensity = 3,
   onChange,
   size = 'md',
+  showAxes = true,
   showLabels = true,
   interactive = true,
-}: EmojiWheelProps) {
-  const [localIntensity, setLocalIntensity] = useState(intensity);
-  const [isPinching, setIsPinching] = useState(false);
+}: MoodWheelProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const initialDistanceRef = useRef(0);
-  const initialIntensityRef = useRef(0);
+  const [isDragging, setIsDragging] = useState(false);
 
   const sizeClasses = {
-    sm: { container: 'w-48 h-48', emoji: 'text-2xl', label: 'text-[9px]' },
-    md: { container: 'w-64 h-64', emoji: 'text-3xl', label: 'text-[10px]' },
-    lg: { container: 'w-80 h-80', emoji: 'text-4xl', label: 'text-xs' },
+    sm: { container: 'w-48 h-48', emoji: 'text-3xl', label: 'text-xs' },
+    md: { container: 'w-64 h-64', emoji: 'text-4xl', label: 'text-sm' },
+    lg: { container: 'w-80 h-80', emoji: 'text-5xl', label: 'text-base' },
   };
 
   const s = sizeClasses[size];
 
-  // Calculate position on the wheel
-  const getPosition = useCallback((index: number, total: number) => {
-    const angle = (index / total) * 2 * Math.PI - Math.PI / 2; // Start from top
-    const radius = 38; // % from center
-    const x = 50 + radius * Math.cos(angle);
-    const y = 50 + radius * Math.sin(angle);
-    return { x, y };
+  // Handle touch/mouse interaction
+  const getPositionFromEvent = useCallback((clientX: number, clientY: number) => {
+    if (!containerRef.current) return { valence: 0, energy: 0 };
+    
+    const rect = containerRef.current.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    const maxRadius = rect.width / 2;
+    
+    // Calculate position relative to center
+    let dx = clientX - centerX;
+    let dy = clientY - centerY;
+    
+    // Clamp to circle
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    if (distance > maxRadius) {
+      const scale = maxRadius / distance;
+      dx *= scale;
+      dy *= scale;
+    }
+    
+    // Convert to normalized coordinates (-1 to 1)
+    // Note: Y is inverted in screen coordinates (down is positive)
+    const energy = dx / maxRadius;      // X axis: left (-1) to right (1)
+    const valence = -dy / maxRadius;    // Y axis: bottom (-1) to top (1)
+    
+    return { valence, energy };
   }, []);
 
-  // Pinch gesture handlers
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    if (e.touches.length === 2) {
-      setIsPinching(true);
-      const dx = e.touches[0].clientX - e.touches[1].clientX;
-      const dy = e.touches[0].clientY - e.touches[1].clientY;
-      initialDistanceRef.current = Math.sqrt(dx * dx + dy * dy);
-      initialIntensityRef.current = localIntensity;
-    }
-  }, [localIntensity]);
+  const handleStart = useCallback((clientX: number, clientY: number) => {
+    if (!interactive) return;
+    setIsDragging(true);
+    const { valence, energy } = getPositionFromEvent(clientX, clientY);
+    const { emoji, label, intensity } = getEmojiForPosition(valence, energy);
+    onChange({ valence, energy, emoji, label, intensity });
+  }, [interactive, getPositionFromEvent, onChange]);
 
-  const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    if (isPinching && e.touches.length === 2) {
-      const dx = e.touches[0].clientX - e.touches[1].clientX;
-      const dy = e.touches[0].clientY - e.touches[1].clientY;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-      
-      const scale = distance / initialDistanceRef.current;
-      const newIntensity = Math.max(1, Math.min(5, Math.round(initialIntensityRef.current * scale)));
-      setLocalIntensity(newIntensity);
-    }
-  }, [isPinching]);
+  const handleMove = useCallback((clientX: number, clientY: number) => {
+    if (!isDragging || !interactive) return;
+    const { valence, energy } = getPositionFromEvent(clientX, clientY);
+    const { emoji, label, intensity } = getEmojiForPosition(valence, energy);
+    onChange({ valence, energy, emoji, label, intensity });
+  }, [isDragging, interactive, getPositionFromEvent, onChange]);
 
-  const handleTouchEnd = useCallback(() => {
-    if (isPinching && value) {
-      onChange(value, localIntensity);
-    }
-    setIsPinching(false);
-  }, [isPinching, value, localIntensity, onChange]);
+  const handleEnd = useCallback(() => {
+    setIsDragging(false);
+  }, []);
 
-  // Mouse wheel for intensity
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    if (!value) return;
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? -1 : 1;
-    const newIntensity = Math.max(1, Math.min(5, localIntensity + delta));
-    setLocalIntensity(newIntensity);
-    onChange(value, newIntensity);
-  }, [value, localIntensity, onChange]);
+  // Mouse events
+  const handleMouseDown = (e: React.MouseEvent) => {
+    handleStart(e.clientX, e.clientY);
+  };
+  
+  const handleMouseMove = (e: React.MouseEvent) => {
+    handleMove(e.clientX, e.clientY);
+  };
+
+  // Touch events
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    handleStart(touch.clientX, touch.clientY);
+  };
+  
+  const handleTouchMove = (e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    handleMove(touch.clientX, touch.clientY);
+  };
+
+  // Calculate selector position
+  const getSelectorPosition = () => {
+    if (!value) return { x: 50, y: 50 };
+    
+    // Convert normalized coords to percentage
+    const x = 50 + value.energy * 50;
+    const y = 50 - value.valence * 50;  // Invert Y for screen coords
+    
+    return { x, y };
+  };
+
+  const selectorPos = getSelectorPosition();
+
+  // Generate gradient zones for visual feedback
+  const getBackgroundGradient = () => {
+    // Create a conic gradient showing the emotional quadrants
+    return `conic-gradient(
+      from -45deg at 50% 50%,
+      #fef3c7 0deg 90deg,      /* Top-right: Positive + High Energy (yellow) */
+      #bbf7d0 90deg 180deg,    /* Top-left: Positive + Low Energy (green) */
+      #fee2e2 180deg 270deg,   /* Bottom-left: Negative + Low Energy (red) */
+      #fed7aa 270deg 360deg    /* Bottom-right: Negative + High Energy (orange) */
+    )`;
+  };
 
   return (
-    <div
-      ref={containerRef}
-      className={`relative ${s.container} mx-auto select-none`}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-      onWheel={handleWheel}
-    >
-      {/* Center circle - shows selected mood */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <div className={`w-16 h-16 rounded-full flex flex-col items-center justify-center transition-all ${
-          value ? 'bg-white/10 shadow-lg' : 'bg-white/5'
-        }`}>
-          {value ? (
+    <div className="flex flex-col items-center gap-4">
+      <div
+        ref={containerRef}
+        className={`relative ${s.container} rounded-full overflow-hidden cursor-crosshair select-none`}
+        style={{ background: getBackgroundGradient() }}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleEnd}
+        onMouseLeave={handleEnd}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleEnd}
+      >
+        {/* Grid overlay */}
+        <div className="absolute inset-0 opacity-20">
+          {/* Concentric circles for intensity */}
+          <div className="absolute inset-4 rounded-full border border-white/30" />
+          <div className="absolute inset-12 rounded-full border border-white/30" />
+          <div className="absolute inset-20 rounded-full border border-white/30" />
+          
+          {/* Axes */}
+          {showAxes && (
             <>
-              <span className="text-2xl">
-                {options.find(o => o.id === value)?.emoji}
-              </span>
-              <span className="text-[9px] text-white/60 font-medium">
-                {localIntensity}/5
-              </span>
+              <div className="absolute left-1/2 top-0 bottom-0 w-px bg-white/40" />
+              <div className="absolute top-1/2 left-0 right-0 h-px bg-white/40" />
             </>
-          ) : (
-            <span className="text-xs text-white/30">Tap</span>
           )}
         </div>
+
+        {/* Axis labels */}
+        {showLabels && (
+          <>
+            <span className="absolute top-2 left-1/2 -translate-x-1/2 text-[10px] font-medium text-white/70">
+              Positive
+            </span>
+            <span className="absolute bottom-2 left-1/2 -translate-x-1/2 text-[10px] font-medium text-white/70">
+              Negative
+            </span>
+            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-medium text-white/70">
+              Calm
+            </span>
+            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-medium text-white/70">
+              Energetic
+            </span>
+          </>
+        )}
+
+        {/* Selector dot */}
+        <div
+          className={`absolute w-8 h-8 rounded-full transform -translate-x-1/2 -translate-y-1/2 transition-all duration-75 ${
+            isDragging ? 'scale-110' : 'scale-100'
+          }`}
+          style={{
+            left: `${selectorPos.x}%`,
+            top: `${selectorPos.y}%`,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+          }}
+        >
+          <div className="w-full h-full rounded-full bg-white flex items-center justify-center text-lg">
+            {value?.emoji || '😐'}
+          </div>
+        </div>
+
+        {/* Center point */}
+        <div className="absolute left-1/2 top-1/2 w-3 h-3 rounded-full bg-white/30 transform -translate-x-1/2 -translate-y-1/2" />
       </div>
 
-      {/* Emoji options around the wheel */}
-      {options.map((option, index) => {
-        const pos = getPosition(index, options.length);
-        const isSelected = value === option.id;
-        const scale = isSelected ? 1.2 + (localIntensity * 0.05) : 1;
-
-        return (
-          <button
-            key={option.id}
-            type="button"
-            disabled={!interactive}
-            className={`absolute transform -translate-x-1/2 -translate-y-1/2 transition-all ${
-              interactive ? 'cursor-pointer hover:scale-110 active:scale-95' : 'cursor-default'
-            } ${isSelected ? 'z-10' : 'z-0'}`}
-            style={{
-              left: `${pos.x}%`,
-              top: `${pos.y}%`,
-              transform: `translate(-50%, -50%) scale(${scale})`,
-            }}
-            onClick={() => {
-              if (interactive) {
-                onChange(option.id, localIntensity);
-              }
-            }}
-          >
-            <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
-              isSelected
-                ? `${option.color} shadow-lg ring-2 ring-white/30`
-                : 'bg-white/5 hover:bg-white/10'
-            }`}>
-              <span className={s.emoji}>{option.emoji}</span>
-            </div>
-            {showLabels && (
-              <p className={`text-center mt-1 font-medium ${
-                isSelected ? 'text-white' : 'text-white/40'
-              } ${s.label}`}>
-                {option.label}
-              </p>
-            )}
-          </button>
-        );
-      })}
-
-      {/* Intensity indicator */}
-      {value && interactive && (
-        <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 flex items-center gap-1">
-          {[1, 2, 3, 4, 5].map((level) => (
-            <div
-              key={level}
-              className={`w-1.5 h-1.5 rounded-full transition-all ${
-                level <= localIntensity
-                  ? 'bg-sage scale-100'
-                  : 'bg-white/20 scale-75'
-              }`}
-            />
-          ))}
+      {/* Current selection info */}
+      {value && (
+        <div className="text-center space-y-1">
+          <div className="flex items-center justify-center gap-2">
+            <span className="text-2xl">{value.emoji}</span>
+            <span className={`font-semibold ${s.label}`}>{value.label}</span>
+          </div>
+          <div className="flex items-center justify-center gap-4 text-xs text-white/60">
+            <span>Valence: {value.valence.toFixed(2)}</span>
+            <span>Energy: {value.energy.toFixed(2)}</span>
+            <span>Intensity: {Math.round(value.intensity * 100)}%</span>
+          </div>
         </div>
       )}
-
-      {/* Pinch hint */}
-      {value && interactive && (
-        <p className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 text-[9px] text-white/20">
-          Pinch or scroll to adjust intensity
-        </p>
+      
+      {!value && (
+        <p className="text-sm text-white/50">Drag to select your mood</p>
       )}
     </div>
   );
 }
 
 // ============================================================
-// COMPACT MOOD SELECTOR (for quick check-ins)
+// COMPACT MOOD SELECTOR (quick version with preset options)
 // ============================================================
 
 interface CompactMoodSelectorProps {
-  value: string | null;
-  onChange: (moodId: string) => void;
-  options?: MoodOption[];
+  value: MoodState | null;
+  onChange: (mood: MoodState) => void;
 }
 
-export function CompactMoodSelector({
-  value,
-  onChange,
-  options = MOOD_WHEEL_6,
-}: CompactMoodSelectorProps) {
+export function CompactMoodSelector({ value, onChange }: CompactMoodSelectorProps) {
+  const presets: MoodState[] = [
+    { valence: 0.8, energy: 0.8, emoji: '🤩', label: 'Great', intensity: 0.9 },
+    { valence: 0.5, energy: -0.3, emoji: '😌', label: 'Calm', intensity: 0.4 },
+    { valence: 0, energy: 0, emoji: '😐', label: 'Okay', intensity: 0.2 },
+    { valence: -0.5, energy: 0.5, emoji: '😠', label: 'Stressed', intensity: 0.6 },
+    { valence: -0.7, energy: -0.5, emoji: '😢', label: 'Down', intensity: 0.7 },
+  ];
+
   return (
     <div className="flex items-center justify-center gap-2 flex-wrap">
-      {options.map((option) => {
-        const isSelected = value === option.id;
+      {presets.map((preset) => {
+        const isSelected = value?.label === preset.label;
         return (
           <button
-            key={option.id}
+            key={preset.label}
             type="button"
-            onClick={() => onChange(option.id)}
-            className={`w-11 h-11 rounded-full flex items-center justify-center transition-all ${
+            onClick={() => onChange(preset)}
+            className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
               isSelected
-                ? `${option.color} shadow-md scale-110 ring-2 ring-white/20`
-                : 'bg-white/5 hover:bg-white/10 hover:scale-105'
+                ? 'bg-sage shadow-lg scale-110 ring-2 ring-white/20'
+                : 'bg-white/10 hover:bg-white/20 hover:scale-105'
             }`}
-            title={option.label}
+            title={preset.label}
           >
-            <span className="text-xl">{option.emoji}</span>
+            <span className="text-xl">{preset.emoji}</span>
           </button>
         );
       })}
@@ -276,12 +351,15 @@ export function CompactMoodSelector({
 }
 
 // ============================================================
-// MOOD HISTORY
+// MOOD HISTORY & UTILS
 // ============================================================
 
 export interface MoodEntry {
   id: string;
-  moodId: string;
+  valence: number;
+  energy: number;
+  emoji: string;
+  label: string;
   intensity: number;
   timestamp: number;
   context: 'morning' | 'evening' | 'wind_down' | 'custom';
@@ -289,7 +367,7 @@ export interface MoodEntry {
 
 export function getMoodHistory(): MoodEntry[] {
   try {
-    return JSON.parse(localStorage.getItem('ed_mood_history') || '[]');
+    return JSON.parse(localStorage.getItem('ed_mood_history_xy') || '[]');
   } catch { return []; }
 }
 
@@ -299,25 +377,21 @@ export function addMoodEntry(entry: Omit<MoodEntry, 'id'>): void {
   // Keep last 90 days
   const cutoff = Date.now() - 90 * 86400000;
   const trimmed = history.filter(e => e.timestamp > cutoff);
-  localStorage.setItem('ed_mood_history', JSON.stringify(trimmed));
+  localStorage.setItem('ed_mood_history_xy', JSON.stringify(trimmed));
 }
 
-export function getMoodTrend(days: number = 7): { date: string; avgValence: number; count: number }[] {
+export function getMoodTrend(days: number = 7): { date: string; avgValence: number; avgEnergy: number; count: number }[] {
   const history = getMoodHistory();
   const cutoff = Date.now() - days * 86400000;
   const recent = history.filter(e => e.timestamp > cutoff);
 
-  const byDay = new Map<string, { total: number; count: number }>();
+  const byDay = new Map<string, { valenceTotal: number; energyTotal: number; count: number }>();
   
   for (const entry of recent) {
     const date = new Date(entry.timestamp).toISOString().split('T')[0];
-    const mood = [...MOOD_WHEEL_6, ...MOOD_WHEEL_8, ...MOOD_WHEEL_12].find(m => m.id === entry.moodId);
-    const valenceScore = mood
-      ? mood.valence === 'positive' ? entry.intensity : mood.valence === 'negative' ? -entry.intensity : 0
-      : 0;
-    
-    const existing = byDay.get(date) || { total: 0, count: 0 };
-    existing.total += valenceScore;
+    const existing = byDay.get(date) || { valenceTotal: 0, energyTotal: 0, count: 0 };
+    existing.valenceTotal += entry.valence;
+    existing.energyTotal += entry.energy;
     existing.count += 1;
     byDay.set(date, existing);
   }
@@ -326,7 +400,8 @@ export function getMoodTrend(days: number = 7): { date: string; avgValence: numb
     .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([date, data]) => ({
       date,
-      avgValence: data.count > 0 ? data.total / data.count : 0,
+      avgValence: data.count > 0 ? data.valenceTotal / data.count : 0,
+      avgEnergy: data.count > 0 ? data.energyTotal / data.count : 0,
       count: data.count,
     }));
 }

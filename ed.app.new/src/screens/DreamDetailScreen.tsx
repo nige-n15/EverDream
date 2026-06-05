@@ -48,6 +48,7 @@ interface Dream {
   capturedEmotions?: EmotionCapture | null;
   isSample?: boolean;
   sourcePhotos?: string[];
+  videoCapture?: { url: string; capturedAt: string; duration?: number } | null;
 }
 
 interface SimilarDream {
@@ -150,6 +151,29 @@ export function DreamDetailScreen({
             <div className="rounded-2xl border border-sage/20 bg-sage/5 px-4 py-2.5 flex items-center gap-2 text-sm text-sageDark">
               <Camera className="w-4 h-4" strokeWidth={1.75} />
               <span>Imported from journal photo{detailDream.sourcePhotos && detailDream.sourcePhotos.length > 1 ? 's' : ''}</span>
+            </div>
+          )}
+
+          {/* Video capture indicator */}
+          {detailDream.captureMode === 'video' && detailDream.videoCapture && (
+            <div className="space-y-3">
+              <div className="rounded-2xl border border-sage/20 bg-sage/5 px-4 py-2.5 flex items-center gap-2 text-sm text-sageDark">
+                <Camera className="w-4 h-4" strokeWidth={1.75} />
+                <span>Video journal entry</span>
+              </div>
+              <div className="rounded-2xl border border-line bg-black overflow-hidden">
+                <video
+                  src={detailDream.videoCapture.url}
+                  controls
+                  className="w-full"
+                  poster={detailDream.generatedImage?.url}
+                />
+              </div>
+              {detailDream.videoCapture.duration && (
+                <div className="text-xs text-muted text-center">
+                  Duration: {Math.floor(detailDream.videoCapture.duration / 60)}:{(detailDream.videoCapture.duration % 60).toString().padStart(2, '0')}
+                </div>
+              )}
             </div>
           )}
 

@@ -12,7 +12,7 @@ dist/
 build/
 target/
 
-# Python
+# Cache directories
 __pycache__/
 *.pyc
 *.pyo
@@ -31,28 +31,27 @@ __pycache__/
 
 # OS
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
 
-# IDE
+# IDE specific
 .vscode/
 .idea/
-*.swp
-*.swo
 
-# Coverage
-.coverage
-coverage/
-htmlcov/
+# Package lock files (if not already managed by version control)
+yarn.lock
+package-lock.json
 
-# Testing
-.mypy_cache/
-.pytest_cache/
-.hypothesis/
+# Runtime specific (Bun)
+.bun/
+bun.lock
+
+# Configuration and build tools
+.nyc_output/
+.jscache/
+tsconfig.tsbuildinfo
+
+# Serverless/Wrangler specific
+.wrangler/
 
 # IDE
 .vscode/

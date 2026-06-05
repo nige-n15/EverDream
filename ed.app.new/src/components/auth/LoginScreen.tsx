@@ -28,8 +28,22 @@ export default function LoginScreen() {
       setError('Please enter your email address.');
       return;
     }
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters.');
+    
+    // SECURITY FIX: Stronger password requirements
+    // Minimum 12 characters with complexity requirements
+    if (password.length < 12) {
+      setError('Password must be at least 12 characters long.');
+      return;
+    }
+    
+    // Check for password complexity
+    const hasUpperCase = /[A-Z]/.test(password);
+    const hasLowerCase = /[a-z]/.test(password);
+    const hasNumbers = /\d/.test(password);
+    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+    
+    if (!hasUpperCase || !hasLowerCase || !hasNumbers || !hasSpecialChar) {
+      setError('Password must include uppercase, lowercase, numbers, and special characters.');
       return;
     }
 

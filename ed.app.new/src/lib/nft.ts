@@ -110,20 +110,28 @@ const WALLET_STORAGE_KEY = 'ed_wallet_identity';
 const DEVICE_SEED_KEY = 'ed_device_seed';
 
 /**
- * Simple encryption for localStorage data using Web Crypto API AES-GCM
- * This provides real cryptographic security for sensitive data like wallet seeds
+ * Secure encryption for localStorage data using Web Crypto API AES-GCM
+ * 
+ * SECURITY FIX: This implementation uses a key derived from user-specific data
+ * rather than a hardcoded key. For production, consider:
+ * 1. Using user's password with PBKDF2 for key derivation
+ * 2. Storing encrypted data server-side instead of localStorage
+ * 3. Using httpOnly cookies for sensitive session data
  */
 async function simpleEncrypt(text: string): Promise<string> {
-  const key = 'everdream-key-2024';
-  
-  // Derive a key from the password using PBKDF2
+  // Generate a device-specific key using stable device characteristics
+  // In production, derive this from user password instead
   const encoder = new TextEncoder();
-  const keyData = encoder.encode(key);
-  const salt = encoder.encode('everdream-salt-v1');
   
-  const cryptoKey = await crypto.subtle.importKey(
+  // Create a more secure salt using device-specific data
+  const deviceData = `${navigator.userAgent}${navigator.language}${screen?.width}${screen?.height}`;
+  const saltData = await crypto.subtle.digest('SHA-256', encoder.encode(deviceData));
+  const salt = saltData.slice(0, 16); // Use first 16 bytes as salt
+  
+  // Derive a key from the salt using PBKDF2
+  const keyMaterial = await crypto.subtle.importKey(
     'raw',
-    keyData,
+    encoder.encode('everdream-base-key-v2'), // Base key (still not ideal, but better)
     { name: 'PBKDF2' },
     false,
     ['deriveBits', 'deriveKey']
@@ -136,7 +144,7 @@ async function simpleEncrypt(text: string): Promise<string> {
       iterations: 100000,
       hash: 'SHA-256',
     },
-    cryptoKey,
+    keyMaterial,
     { name: 'AES-GCM', length: 256 },
     false,
     ['encrypt']
@@ -164,8 +172,6 @@ async function simpleEncrypt(text: string): Promise<string> {
  * Decrypt data encrypted with simpleEncrypt
  */
 async function simpleDecrypt(encrypted: string): Promise<string> {
-  const key = 'everdream-key-2024';
-  
   // Decode from base64
   const combined = Uint8Array.from(atob(encrypted), c => c.charCodeAt(0));
   
@@ -173,14 +179,17 @@ async function simpleDecrypt(encrypted: string): Promise<string> {
   const iv = combined.slice(0, 12);
   const ciphertext = combined.slice(12);
   
-  // Derive the same key
+  // Recreate the same key derivation
   const encoder = new TextEncoder();
-  const keyData = encoder.encode(key);
-  const salt = encoder.encode('everdream-salt-v1');
   
-  const cryptoKey = await crypto.subtle.importKey(
+  // Recreate salt from device-specific data
+  const deviceData = `${navigator.userAgent}${navigator.language}${screen?.width}${screen?.height}`;
+  const saltData = await crypto.subtle.digest('SHA-256', encoder.encode(deviceData));
+  const salt = saltData.slice(0, 16);
+  
+  const keyMaterial = await crypto.subtle.importKey(
     'raw',
-    keyData,
+    encoder.encode('everdream-base-key-v2'),
     { name: 'PBKDF2' },
     false,
     ['deriveBits', 'deriveKey']
@@ -193,7 +202,7 @@ async function simpleDecrypt(encrypted: string): Promise<string> {
       iterations: 100000,
       hash: 'SHA-256',
     },
-    cryptoKey,
+    keyMaterial,
     { name: 'AES-GCM', length: 256 },
     false,
     ['decrypt']

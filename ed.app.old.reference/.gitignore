@@ -1,8 +1,0 @@
-.env
-.env.*
-!.env.example
-!.env.discord.example
-data/
-vscode-antigravity-cockpit
-discord
-.sixty

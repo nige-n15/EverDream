@@ -614,7 +614,6 @@ export async function generateDreamImage(
 // ── Exports ──────────────────────────────────────────────────
 
 export {
-export {
   generateWithPrimaryService,
   generateWithSecondaryService,
   generateWithEdgeFunction,

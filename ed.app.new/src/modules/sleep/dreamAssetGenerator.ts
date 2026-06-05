@@ -131,6 +131,15 @@ async function generateWithEdgeFunction(prompt: string, style: string = 'dreamli
       console.log('[AssetGen] Image URL received:', result.imageUrl?.substring(0, 80));
       
       if (result.imageUrl) {
+        // Validate the image URL actually loads
+        try {
+          await validateImageUrl(result.imageUrl, 30000);
+          console.log('[AssetGen] Edge function image validated successfully');
+        } catch (validationError) {
+          console.error('[AssetGen] Edge function image validation failed:', validationError);
+          throw new Error('Edge function generated invalid image URL');
+        }
+        
         return {
           id: makeId(),
           prompt: result.prompt || prompt,
@@ -152,36 +161,44 @@ async function generateWithEdgeFunction(prompt: string, style: string = 'dreamli
   }
 
   // Fallback: direct Pollinations
-  return generateWithPollinations(prompt);
+  return generateWithPollinations(prompt, style);
 }
 
 /**
  * Generate image using Pollinations.ai — FREE tier with optimized parameters.
  * Uses direct URL format which works reliably without CORS issues.
+ * NOTE: nologo=true requires payment, so we use nologo=false for free tier.
  */
-async function generateWithPollinations(prompt: string): Promise<DreamAsset> {
+async function generateWithPollinations(prompt: string, style: string = 'dreamlike'): Promise<DreamAsset> {
   console.log('[AssetGen] Generating via Pollinations...');
   const enhancedPrompt = buildDreamPrompt(prompt);
   const encodedPrompt = encodeURIComponent(enhancedPrompt);
   // Use direct pollinations.ai URL with reliable parameters
-  const imageUrl = `${POLLINATIONS_API_URL}/${encodedPrompt}?width=1024&height=1024&seed=${Date.now() % 1000000}&nologo=true`;
+  // IMPORTANT: nologo=false for free tier (nologo=true returns 402 Payment Required)
+  const imageUrl = `${POLLINATIONS_API_URL}/${encodedPrompt}?width=1024&height=1024&seed=${Date.now() % 1000000}&nologo=false`;
 
   console.log('[AssetGen] Pollinations URL:', imageUrl.substring(0, 100));
   
-  // Don't validate — Pollinations URLs are direct image links
-  // The browser will handle loading/errors naturally
+  // Validate the image URL actually loads (with timeout)
+  try {
+    await validateImageUrl(imageUrl, 30000);
+    console.log('[AssetGen] Pollinations image validated successfully');
+  } catch (validationError) {
+    console.error('[AssetGen] Pollinations image validation failed:', validationError);
+    throw new Error('Pollinations generated invalid image URL');
+  }
 
   return {
     id: makeId(),
     prompt: enhancedPrompt,
     url: imageUrl,
     source: 'pollinations',
-    style: 'dreamlike',
+    style: style || 'dreamlike',
     generatedAt: new Date().toISOString(),
     metadata: {
       provider: 'pollinations.ai',
       model: 'flux',
-      note: 'Free tier - 1024x1024 resolution',
+      note: 'Free tier - 1024x1024 resolution (includes watermark)',
     },
   };
 }
@@ -191,7 +208,7 @@ async function generateWithPollinations(prompt: string): Promise<DreamAsset> {
  * No API key required for basic usage.
  * See: https://developer.puter.com/
  */
-async function generateWithPuter(prompt: string): Promise<DreamAsset> {
+async function generateWithPuter(prompt: string, style: string = 'dreamlike'): Promise<DreamAsset> {
   console.log('[AssetGen] Generating via Puter.com AI...');
   
   const enhancedPrompt = buildDreamPrompt(prompt);
@@ -233,7 +250,17 @@ async function generateWithPuter(prompt: string): Promise<DreamAsset> {
     const blob = await fetch(`data:image/png;base64,${base64Data}`).then(r => r.blob());
     imageUrl = URL.createObjectURL(blob);
   } else {
+    console.error('[AssetGen] Puter AI returned no image data:', result);
     throw new Error('Puter AI returned no image data');
+  }
+
+  // Validate the image URL actually loads
+  try {
+    await validateImageUrl(imageUrl, 30000);
+    console.log('[AssetGen] Puter AI image validated successfully');
+  } catch (validationError) {
+    console.error('[AssetGen] Puter AI image validation failed:', validationError);
+    throw new Error('Puter AI generated invalid image URL');
   }
 
   return {
@@ -241,7 +268,7 @@ async function generateWithPuter(prompt: string): Promise<DreamAsset> {
     prompt: enhancedPrompt,
     url: imageUrl,
     source: 'puter',
-    style: 'dreamlike',
+    style: style || 'dreamlike',
     generatedAt: new Date().toISOString(),
     metadata: {
       provider: 'puter.com',
@@ -256,7 +283,7 @@ async function generateWithPuter(prompt: string): Promise<DreamAsset> {
  * Requires running Stable Diffusion locally.
  * Configure via VITE_LOCAL_GEN_URL or use defaults.
  */
-async function generateWithLocalProvider(prompt: string): Promise<DreamAsset> {
+async function generateWithLocalProvider(prompt: string, style: string = 'dreamlike'): Promise<DreamAsset> {
   console.log('[AssetGen] Generating via local provider...');
   
   const localUrl = import.meta.env.VITE_LOCAL_GEN_URL || '';
@@ -313,256 +340,8 @@ async function generateWithLocalProvider(prompt: string): Promise<DreamAsset> {
     const blob = await fetch(`data:image/png;base64,${base64Image}`).then(r => r.blob());
     const imageUrl = URL.createObjectURL(blob);
     
-    console.log('[AssetGen] A1111 image generated successfully');
-    
-    return {
-      id: makeId(),
-      prompt: enhancedPrompt,
-      url: imageUrl,
-      source: 'local-a1111',
-      style: 'dreamlike',
-      generatedAt: new Date().toISOString(),
-      metadata: {
-        provider: 'local-comfyui',
-        model: 'stable-diffusion',
-        note: 'Generated locally on your machine',
-      },
-    };
-  } else if (provider === 'comfyui') {
-    console.log('[AssetGen] Calling ComfyUI API...');
-    
-    // ComfyUI workflow for txt2img
-    const workflow = {
-      "3": {
-        "class_type": "KSampler",
-        "inputs": {
-          "cfg": 7,
-          "denoise": 1,
-          "latent_image": ["5", 0],
-          "model": ["4", 0],
-          "negative": ["7", 0],
-          "positive": ["6", 0],
-          "sampler_name": "euler",
-          "scheduler": "normal",
-          "seed": Date.now(),
-          "steps": 20
-        }
-      },
-      "4": {
-        "class_type": "CheckpointLoaderSimple",
-        "inputs": { "ckpt_name": "v1-5-pruned-emaonly.ckpt" }
-      },
-      "5": {
-        "class_type": "EmptyLatentImage",
-        "inputs": { "batch_size": 1, "height": 1024, "width": 1024 }
-      },
-      "6": {
-        "class_type": "CLIPTextEncode",
-        "inputs": { "clip": ["4", 1], "text": enhancedPrompt }
-      },
-      "7": {
-        "class_type": "CLIPTextEncode",
-        "inputs": { "clip": ["4", 1], "text": "blurry, low quality, distorted, ugly" }
-      },
-      "8": {
-        "class_type": "VAEDecode",
-        "inputs": { "samples": ["3", 0], "vae": ["4", 2] }
-      },
-      "9": {
-        "class_type": "SaveImage",
-        "inputs": { "filename_prefix": "ComfyUI", "images": ["8", 0] }
-      }
-    };
-
-    const response = await fetch(`${baseUrl}/prompt`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt: workflow }),
-    });
-
-    console.log('[AssetGen] ComfyUI response status:', response.status);
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`ComfyUI API failed: ${response.status} - ${errorText}`);
-    }
-
-    const result = await response.json();
-    const promptId = result.prompt_id;
-    
-    // Poll for completion
-    console.log('[AssetGen] Waiting for ComfyUI generation to complete...');
-    let imageUrl: string | null = null;
-    let attempts = 0;
-    const maxAttempts = 30;
-    
-    while (attempts < maxAttempts && !imageUrl) {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const historyResponse = await fetch(`${baseUrl}/history/${promptId}`);
-      if (historyResponse.ok) {
-        const history = await historyResponse.json();
-        if (history[promptId]?.outputs) {
-          const outputs = history[promptId].outputs;
-          for (const nodeId in outputs) {
-            const output = outputs[nodeId];
-            if (output.images) {
-              const img = output.images[0];
-              imageUrl = `${baseUrl}/view?filename=${img.filename}&subfolder=${img.subfolder}&type=${img.type}`;
-              break;
-            }
-          }
-        }
-      }
-      attempts++;
-    }
-    
-    if (!imageUrl) {
-      throw new Error('ComfyUI generation timed out');
-    }
-    
-    console.log('[AssetGen] ComfyUI image generated successfully');
-    
-    return {
-      id: makeId(),
-      prompt: enhancedPrompt,
-      url: imageUrl,
-      source: 'local-comfyui',
-      style: 'dreamlike',
-      generatedAt: new Date().toISOString(),
-      metadata: {
-        provider: 'local-comfyui',
-        model: 'stable-diffusion',
-        note: 'Generated locally on your machine',
-      },
-    };
-  }
-  
-  throw new Error('Unknown local provider');
-}
-
-// Note: generateWithHuggingFace function removed as part of 2-stage simplification
-// The HuggingFace constant is also removed from the top of the file
-
-/**
- * Generate a fallback image using a placeholder SVG gradient.
- * Unsplash source API was shut down in 2024, so we use a generated placeholder instead.
- */
-async function generateFallbackImage(prompt: string): Promise<DreamAsset> {
-  // Create a deterministic color based on prompt
-  const hash = prompt.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  const hue1 = hash % 360;
-  const hue2 = (hue1 + 40) % 360;
-  
-  // Generate SVG gradient placeholder
-  const svg = encodeURIComponent(`
-    <svg xmlns="http://www.w3.org/2000/svg" width="800" height="600">
-      <defs>
-        <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" style="stop-color:hsl(${hue1}, 70%, 50%);stop-opacity:1" />
-          <stop offset="100%" style="stop-color:hsl(${hue2}, 70%, 30%);stop-opacity:1" />
-        </linearGradient>
-      </defs>
-      <rect width="800" height="600" fill="url(#grad)"/>
-      <text x="50%" y="50%" text-anchor="middle" fill="white" font-size="24" font-family="sans-serif" opacity="0.8">
-        Dream Image
-      </text>
-    </svg>
-  `.trim().replace(/\n/g, ''));
-  
-  const imageUrl = `data:image/svg+xml;charset=utf-8,${svg}`;
-
-  return {
-    id: makeId(),
-    prompt,
-    url: imageUrl,
-    source: 'fallback',
-    style: 'dreamlike',
-    generatedAt: new Date().toISOString(),
-    metadata: {
-      provider: 'svg-placeholder',
-      note: 'Generated placeholder - all providers failed',
-    },
-  };
-}
-
-// ── Main Exports ─────────────────────────────────────────────
-
-/**
- * Main image generation function — 2-Stage Process:
- * 
- * STAGE 1: Cloud APIs (Try in order)
- *   1a. Puter.com AI API - FREE, easy to use (https://developer.puter.com/)
- *   1b. Supabase Edge Function (handles CORS, proxies Pollinations) - FREE
- *   1c. Direct Pollinations.ai - FREE, no API key needed
- * 
- * STAGE 2: Local Generation (if enabled and cloud fails)
- *   2a. AUTOMATIC1111 Stable Diffusion WebUI - Free, full control
- *   2b. ComfyUI - Free, workflow-based
- * 
- * FALLBACK:
- *   3. SVG placeholder - Always works
- * 
- * Each step logs its progress for debugging.
- * 
- * @param prompt - The dream text or description to visualize
- * @returns Promise resolving to DreamAsset with image URL and metadata
- */
-export async function generateDreamImage(prompt: string, style?: string): Promise<DreamAsset> {
-  console.log('[AssetGen] Starting image generation for prompt:', prompt.substring(0, 50));
-  
-  // ========== STAGE 1: Cloud APIs ==========
-  
-  try {
-    // First: Try Puter.com AI API (FREE, simple)
-    console.log('[AssetGen] Attempting Puter.com AI...');
-    return await generateWithPuter(prompt, style);
-  } catch (puterError) {
-    console.warn('[AssetGen] Puter.com failed:', puterError);
-  }
-
-  try {
-    // Second: Try Supabase Edge Function (handles CORS)
-    console.log('[AssetGen] Attempting Edge Function...');
-    return await generateWithEdgeFunction(prompt, style);
-  } catch (edgeError) {
-    console.warn('[AssetGen] Edge function failed:', edgeError);
-  }
-
-  try {
-    // Third: Direct Pollinations (may have CORS issues in some browsers)
-    console.log('[AssetGen] Attempting Pollinations direct...');
-    return await generateWithPollinations(prompt);
-  } catch (pollinationsError) {
-    console.warn('[AssetGen] Pollinations failed:', pollinationsError);
-  }
-
-  // ========== STAGE 2: Local Generation (Optional) ==========
-  
-  const enableLocal = import.meta.env.VITE_ENABLE_LOCAL_GEN === 'true';
-  
-  if (enableLocal) {
+    // Validate the generated image
     try {
-      // Fourth: Local generation (ComfyUI or A1111)
-      console.log('[AssetGen] Attempting local provider...');
-      return await generateWithLocalProvider(prompt);
-    } catch (localError) {
-      console.warn('[AssetGen] Local provider failed:', localError);
-    }
-  } else {
-    console.log('[AssetGen] Local generation disabled (set VITE_ENABLE_LOCAL_GEN=true to enable)');
-  }
-
-  // ========== FALLBACK ==========
-  
-  // Final fallback: SVG placeholder
-  console.warn('[AssetGen] All providers failed, using SVG placeholder');
-  return await generateFallbackImage(prompt);
-}
-
-/**
- * Generate multiple dream assets (for future batch processing)
- */
-export async function generateDreamAssets(prompts: string[]): Promise<DreamAsset[]> {
-  return Promise.all(prompts.map(prompt => generateDreamImage(prompt)));
-}
+      await validateImageUrl(imageUrl, 10000);
+      console.log('[AssetGen] A1111 image validated successfully');
+    } catch (va

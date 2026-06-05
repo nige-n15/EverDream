@@ -1,72 +1,73 @@
-```
 # Dependencies
 node_modules/
 
-# Build outputs
+# Build artifacts
 dist/
 build/
 target/
 
-# Cache directories
-.cache/
-.tmp/
-.temp/
-
 # Environment variables
 .env
 .env.local
-.env.*
+*.env.*
 
-# IDE files
+# IDE specific
 .vscode/
 .idea/
-*.swp
-*.swo
 
-# Logs
-*.log
-
-# Coverage reports
-coverage/
-htmlcov/
-.coverage
-
-# Python specific
+# Python
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 .Python
-*.so
-*.egg-info/
-.eggs/
-
-# Temporary files
-*.tmp
-*.temp
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.git/modules/
+*.tmproj
+*.swp
+*.swo
 *~
 .DS_Store
 Thumbs.db
 
-# MyPy cache
-.mypy_cache/
+# TypeScript/JavaScript
+*.tsbuildinfo
+*.js.map
+*.jsx.map
+*.ts.map
+*.tsx.map
+next-env.d.ts
 
-# PyTest cache
-.pytest_cache/
-
-# Distribution / packaging
-.Python
-env/
-venv/
-ENV/
-.venv/
-env.bak/
-venv.bak/
-
-# Compressed files
+# React Native / Expo
+.expo/
+.expo-shared/
+node_modules/
+*.apk
+*.aab
+*.ipa
+*.app
+*.exe
+*.dll
+*.so
+*.dylib
+*.jar
+*.war
+*.ear
 *.zip
-*.gz
 *.tar
+*.gz
 *.tgz
 *.bz2
 *.xz
@@ -86,4 +87,24 @@ venv.bak/
 *.tar.bz2
 *.tar.xz
 *.tar.zst
-```
+coverage/
+htmlcov/
+.mypy_cache/
+.pytest_cache/
+.gradle/
+*.class
+*.o
+*.obj
+*.out
+.a
+.so
+.dll
+.exe
+.jar
+.war
+.ear
+.log
+.tmp
+.swp
+.swo
+*~

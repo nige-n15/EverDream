@@ -48,6 +48,7 @@ import { AppLoadingScreen, ErrorBanner, LoadingOverlay } from './components/ui';
 import { getOrCreateWallet, createDreamNFT, mintNFT, saveNFT, type DreamNFT, type WalletIdentity } from './lib/nft';
 import DreamVisualizer from './components/dreams/DreamVisualizer';
 import DreamCapture from './components/dreams/DreamCapture';
+import { VideoJournalScreen } from './screens/VideoJournalScreen';
 import { analyzeDream, type DreamAnalysis } from './lib/dream-analyzer';
 import type { DreamAsset } from './modules/sleep/types';
 
@@ -1928,38 +1929,133 @@ const DreamJournalApp = () => {
 
       {/* Record (full page) — uses DreamCapture with pipeline progress */}
       {route.screen === 'record' && (
-        <DreamCapture
-          onComplete={async (result, text) => {
-            // Build a complete dream object from the pipeline result
-            const analysis = result.analysis;
-            const imageAsset = result.image;
+        <div className="space-y-6">
+          {/* Quick capture mode selector */}
+          <Card>
+            <p className="text-xs uppercase tracking-[0.2em] text-muted mb-3">Choose how to capture your dream</p>
+            <div className="grid grid-cols-3 gap-3">
+              <button
+                type="button"
+                onClick={() => navigate('record')}
+                className={`flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all ${
+                  true
+                    ? 'border-sage bg-sage/10 text-sageDark'
+                    : 'border-line bg-parchment text-muted hover:bg-parchment/80'
+                }`}
+              >
+                <span className="text-2xl">📝</span>
+                <span className="text-xs font-medium">Text</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => window.location.hash = '#/video-journal'}
+                className={`flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all ${
+                  route.screen === 'video-journal'
+                    ? 'border-sage bg-sage/10 text-sageDark'
+                    : 'border-line bg-parchment text-muted hover:bg-parchment/80'
+                }`}
+              >
+                <span className="text-2xl">🎥</span>
+                <span className="text-xs font-medium">Video</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('import-photos')}
+                className={`flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all ${
+                  route.screen === 'import-photos'
+                    ? 'border-sage bg-sage/10 text-sageDark'
+                    : 'border-line bg-parchment text-muted hover:bg-parchment/80'
+                }`}
+              >
+                <span className="text-2xl">📷</span>
+                <span className="text-xs font-medium">Photos</span>
+              </button>
+            </div>
+          </Card>
+          
+          <DreamCapture
+            onComplete={async (result, text) => {
+              // Build a complete dream object from the pipeline result
+              const analysis = result.analysis;
+              const imageAsset = result.image;
 
+              const newDream = {
+                id: `dream-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                date: new Date().toISOString(),
+                content: text,
+                category: analysis.category || 'uncategorized',
+                themes: analysis.themes || [],
+                emotion: analysis.emotion || 'neutral',
+                symbols: analysis.symbols || [],
+                narrative: analysis.narrative || text,
+                nugget: analysis.nugget || text.substring(0, 100),
+                interpretation: analysis.interpretation || {
+                  symbols: {},
+                  meaning: 'Analysis unavailable',
+                  commonPattern: '',
+                },
+                moodValence: analysis.valence,
+                generatedImage: imageAsset
+                  ? {
+                      url: imageAsset.url,
+                      prompt: imageAsset.prompt,
+                      style: imageAsset.style,
+                      generatedAt: imageAsset.generatedAt,
+                      source: imageAsset.source,
+                    }
+                  : null,
+                captureMode: 'text',
+                isSample: false,
+              };
+
+              // Save to state
+              const updatedDreams = [newDream, ...dreams];
+              setDreams(updatedDreams);
+              await saveDreamsToStorage(updatedDreams);
+
+              // Navigate to the new dream detail
+              navigate('dream', newDream.id);
+            }}
+            onCancel={() => navigate('home')}
+          />
+        </div>
+      )}
+
+      {/* Video Journal Screen */}
+      {route.screen === 'video-journal' && (
+        <VideoJournalScreen
+          onComplete={async (videoUrl, thumbnailUrl, duration) => {
+            // Create a dream entry from video journal
             const newDream = {
               id: `dream-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
               date: new Date().toISOString(),
-              content: text,
-              category: analysis.category || 'uncategorized',
-              themes: analysis.themes || [],
-              emotion: analysis.emotion || 'neutral',
-              symbols: analysis.symbols || [],
-              narrative: analysis.narrative || text,
-              nugget: analysis.nugget || text.substring(0, 100),
-              interpretation: analysis.interpretation || {
+              content: 'Video journal entry - watch to hear the dream details',
+              category: 'video-journal',
+              themes: ['video', 'personal-recording'],
+              emotion: 'neutral',
+              symbols: [],
+              narrative: 'Video journal recording',
+              nugget: `Video journal (${Math.floor(duration / 60)}:${(duration % 60).toString().padStart(2, '0')})`,
+              interpretation: {
                 symbols: {},
-                meaning: 'Analysis unavailable',
+                meaning: 'Video journal - personal reflection',
                 commonPattern: '',
               },
-              moodValence: analysis.valence,
-              generatedImage: imageAsset
+              captureMode: 'video',
+              videoCapture: {
+                url: videoUrl,
+                capturedAt: new Date().toISOString(),
+                duration: duration,
+              },
+              generatedImage: thumbnailUrl
                 ? {
-                    url: imageAsset.url,
-                    prompt: imageAsset.prompt,
-                    style: imageAsset.style,
-                    generatedAt: imageAsset.generatedAt,
-                    source: imageAsset.source,
+                    url: thumbnailUrl,
+                    prompt: 'Video journal thumbnail',
+                    style: 'photo',
+                    generatedAt: new Date().toISOString(),
+                    source: 'video-capture',
                   }
                 : null,
-              captureMode: 'text',
               isSample: false,
             };
 
@@ -1971,7 +2067,7 @@ const DreamJournalApp = () => {
             // Navigate to the new dream detail
             navigate('dream', newDream.id);
           }}
-          onCancel={() => navigate('home')}
+          onCancel={() => navigate('record')}
         />
       )}
 

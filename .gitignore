@@ -2,6 +2,7 @@
 node_modules/
 
 # Build outputs
+# Build artifacts
 dist/
 build/
 target/
@@ -11,22 +12,49 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+*.py.class
 .Python
 env/
 venv/
 .venv/
 .ENV
-.ENV.*
-.python-version
+.env
+.env.local
+.env.*
+.envrc
+.coverage
+.coverage.*
+.cache
 .pytest_cache/
 .mypy_cache/
-.coverage
+.hypothesis/
+# Dependency directories
+.jest/
+.nyc_output/
 coverage/
 
 # Logs
 *.log
 
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Thumbs.db:encryptable
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+
 # Environment specific
+# Environment variables
 .env
 .env.local
 .env.*
@@ -35,9 +63,14 @@ coverage/
 # IDE
 .vscode/
 .idea/
-*.swp
-*.swo
-*~
+*.sublime-project
+*.sublime-workspace
+nbproject/
+
+# Archives
+*.zip
+*.tar
+*.gz
 
 # OS
 .DS_Store
@@ -52,11 +85,48 @@ Thumbs.db
 *.xz
 *.7z
 *.rar
+*.jar
+*.war
+*.ear
+*.deb
+*.rpm
 *.zst
 *.lz4
 *.lzh
 *.cab
 *.arj
+
+# Compiled files
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dll
+*.dylib
+*.exe
+*.out
+*.app
+*.class
+*.elc
+*.beam
+*.mod
+*.ko
+
+# Coverage reports
+coverage/
+htmlcov/
+cover/
+
+# Documentation
+docs/_build/
+.sphinx/
+
+# Distribution / packaging
+.pybuild/
+.tox/
+.nox/
+.cover/
 *.rpm
 *.deb
 *.Z

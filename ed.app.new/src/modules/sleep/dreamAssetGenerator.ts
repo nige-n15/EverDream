@@ -1,21 +1,30 @@
 /**
- * Dream Asset Generator — Multi-Provider Image Generation
+ * Dream Asset Generator — 2-Stage Image Generation Process
  *
- * Generates dream images using multiple providers with automatic fallback.
- * Providers are tried in order of preference (cost/speed/reliability):
- * 1. Supabase Edge Function (proxies Pollinations.ai) - FREE, CORS-safe
- * 2. Direct Pollinations.ai - FREE, no API key needed
- * 3. Fal AI - Very cheap (~$0.001/image), very fast
- * 4. Local Generation (ComfyUI/A1111) - Free if you run it locally
- * 5. HuggingFace Inference API - FREE tier available
- * 6. SVG placeholder fallback - Always works
+ * Generates dream images using a 2-stage fallback process:
+ * 
+ * STAGE 1: Cloud APIs (Try in order)
+ *   1a. Puter.com AI API - FREE, easy to use
+ *   1b. Supabase Edge Function (proxies Pollinations.ai) - FREE, CORS-safe
+ *   1c. Direct Pollinations.ai - FREE, no API key needed
+ * 
+ * STAGE 2: Local Generation (Requires running on your computer)
+ *   2a. AUTOMATIC1111 Stable Diffusion WebUI - Free, full control
+ *   2b. ComfyUI - Free, workflow-based
+ * 
+ * FALLBACK:
+ *   3. SVG placeholder - Always works
+ *
+ * This allows you to:
+ * - Use free cloud APIs first (no setup required)
+ * - Run local Stable Diffusion on your computer for unlimited generations
+ * - Expose local API to the app when cloud services fail
  *
  * Environment variables:
  *   VITE_SUPABASE_URL       — Your Supabase project URL
  *   VITE_SUPABASE_ANON_KEY  — Your Supabase anon/public key
- *   VITE_FAL_AI_KEY         — Fal AI API key (optional, for faster/cheaper generation)
  *   VITE_LOCAL_GEN_URL      — Local generation endpoint (e.g., http://localhost:7860 for A1111)
- *   VITE_HF_INFERENCE_API_KEY — HuggingFace API key (optional)
+ *   VITE_ENABLE_LOCAL_GEN   — Set to "true" to enable local generation fallback
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
@@ -25,12 +34,11 @@ export type { DreamAsset };
 // ── Constants ────────────────────────────────────────────────
 
 const POLLINATIONS_API_URL = 'https://image.pollinations.ai/prompt';
-const HF_API_URL = 'https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0';
-const FAL_AI_API_URL = 'https://fal.run/fal-ai/fast-sdxl';
+const PUTER_AI_API_URL = 'https://api.puter.com/ai/txt2img';
 
 // Local generation endpoints (user-configurable)
-const DEFAULT_COMFYUI_URL = 'http://localhost:8188';
 const DEFAULT_A1111_URL = 'http://localhost:7860';
+const DEFAULT_COMFYUI_URL = 'http://localhost:8188';
 
 // ── Supabase Client ──────────────────────────────────────────
 
@@ -178,61 +186,66 @@ async function generateWithPollinations(prompt: string): Promise<DreamAsset> {
 }
 
 /**
- * Generate image using Fal AI — very fast and cheap (~$0.001/image).
- * Requires VITE_FAL_AI_KEY environment variable.
+ * Generate image using Puter.com AI API — FREE, simple to use.
+ * No API key required for basic usage.
+ * See: https://developer.puter.com/
  */
-async function generateWithFalAI(prompt: string): Promise<DreamAsset> {
-  console.log('[AssetGen] Generating via Fal AI...');
-  const FAL_AI_KEY = import.meta.env.VITE_FAL_AI_KEY || '';
+async function generateWithPuter(prompt: string): Promise<DreamAsset> {
+  console.log('[AssetGen] Generating via Puter.com AI...');
   
-  if (!FAL_AI_KEY) {
-    throw new Error('Fal AI key not configured');
-  }
-
   const enhancedPrompt = buildDreamPrompt(prompt);
   
-  console.log('[AssetGen] Calling Fal AI API...');
-  const response = await fetch(FAL_AI_API_URL, {
+  console.log('[AssetGen] Calling Puter AI API...');
+  const response = await fetch(PUTER_AI_API_URL, {
     method: 'POST',
     headers: {
-      'Authorization': `Key ${FAL_AI_KEY}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
       prompt: enhancedPrompt,
-      image_size: { width: 1024, height: 1024 },
-      num_inference_steps: 28,
-      guidance_scale: 3.5,
+      width: 1024,
+      height: 1024,
+      steps: 20,
+      guidance_scale: 7.5,
       negative_prompt: 'blurry, low quality, distorted, ugly, watermark',
     }),
   });
 
-  console.log('[AssetGen] Fal AI response status:', response.status);
+  console.log('[AssetGen] Puter AI response status:', response.status);
   
   if (!response.ok) {
     const errorText = await response.text();
-    console.error('[AssetGen] Fal AI error:', errorText);
-    throw new Error(`Fal AI API failed: ${response.status} - ${errorText}`);
+    console.error('[AssetGen] Puter AI error:', errorText);
+    throw new Error(`Puter AI API failed: ${response.status} - ${errorText}`);
   }
 
   const result = await response.json();
-  console.log('[AssetGen] Fal AI response received, image URL:', result.images?.[0]?.url?.substring(0, 80));
+  console.log('[AssetGen] Puter AI response received');
   
-  if (!result.images?.[0]?.url) {
-    throw new Error('Fal AI returned no image URL');
+  // Puter returns either a URL or base64 data
+  let imageUrl: string;
+  if (result.url) {
+    imageUrl = result.url;
+  } else if (result.image || result.data) {
+    // If base64, convert to blob URL
+    const base64Data = result.image || result.data;
+    const blob = await fetch(`data:image/png;base64,${base64Data}`).then(r => r.blob());
+    imageUrl = URL.createObjectURL(blob);
+  } else {
+    throw new Error('Puter AI returned no image data');
   }
 
   return {
     id: makeId(),
     prompt: enhancedPrompt,
-    url: result.images[0].url,
-    source: 'fal-ai',
+    url: imageUrl,
+    source: 'puter',
     style: 'dreamlike',
     generatedAt: new Date().toISOString(),
     metadata: {
-      provider: 'fal.ai',
-      model: 'fast-sdxl',
-      note: 'Fast, cheap generation (~$0.001/image)',
+      provider: 'puter.com',
+      model: 'stable-diffusion',
+      note: 'Free generation via Puter AI API',
     },
   };
 }
@@ -427,52 +440,8 @@ async function generateWithLocalProvider(prompt: string): Promise<DreamAsset> {
   throw new Error('Unknown local provider');
 }
 
-/**
- * Generate image using HuggingFace Inference API (free, no auth for public models)
- */
-async function generateWithHuggingFace(prompt: string): Promise<DreamAsset> {
-  const enhancedPrompt = buildDreamPrompt(prompt);
-  const HF_API_KEY = import.meta.env.VITE_HF_INFERENCE_API_KEY || '';
-
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (HF_API_KEY) {
-    headers['Authorization'] = `Bearer ${HF_API_KEY}`;
-  }
-
-  const response = await fetch(HF_API_URL, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      inputs: enhancedPrompt,
-      parameters: {
-        negative_prompt: 'blurry, low quality, distorted, ugly',
-        num_inference_steps: 20,
-        guidance_scale: 7.5,
-      },
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`HuggingFace API failed: ${response.status}`);
-  }
-
-  const blob = await response.blob();
-  const imageUrl = URL.createObjectURL(blob);
-
-  return {
-    id: makeId(),
-    prompt: enhancedPrompt,
-    url: imageUrl,
-    source: 'replicate',
-    style: 'dreamlike',
-    generatedAt: new Date().toISOString(),
-    metadata: {
-      provider: 'huggingface.co',
-      model: 'stabilityai/stable-diffusion-xl-base-1.0',
-      note: 'Free generation via Inference API',
-    },
-  };
-}
+// Note: generateWithHuggingFace function removed as part of 2-stage simplification
+// The HuggingFace constant is also removed from the top of the file
 
 /**
  * Generate a fallback image using a placeholder SVG gradient.
@@ -519,13 +488,19 @@ async function generateFallbackImage(prompt: string): Promise<DreamAsset> {
 // ── Main Exports ─────────────────────────────────────────────
 
 /**
- * Main image generation function — tries providers in order of preference:
- * 1. Supabase Edge Function (handles CORS, proxies Pollinations) - FREE
- * 2. Direct Pollinations.ai - FREE, no API key needed
- * 3. Fal AI - Very cheap (~$0.001/image), very fast (requires API key)
- * 4. Local Generation (ComfyUI/A1111) - Free if you run it locally
- * 5. HuggingFace Inference API - FREE tier available
- * 6. SVG placeholder fallback - Always works
+ * Main image generation function — 2-Stage Process:
+ * 
+ * STAGE 1: Cloud APIs (Try in order)
+ *   1a. Puter.com AI API - FREE, easy to use (https://developer.puter.com/)
+ *   1b. Supabase Edge Function (handles CORS, proxies Pollinations) - FREE
+ *   1c. Direct Pollinations.ai - FREE, no API key needed
+ * 
+ * STAGE 2: Local Generation (if enabled and cloud fails)
+ *   2a. AUTOMATIC1111 Stable Diffusion WebUI - Free, full control
+ *   2b. ComfyUI - Free, workflow-based
+ * 
+ * FALLBACK:
+ *   3. SVG placeholder - Always works
  * 
  * Each step logs its progress for debugging.
  * 
@@ -535,8 +510,18 @@ async function generateFallbackImage(prompt: string): Promise<DreamAsset> {
 export async function generateDreamImage(prompt: string): Promise<DreamAsset> {
   console.log('[AssetGen] Starting image generation for prompt:', prompt.substring(0, 50));
   
+  // ========== STAGE 1: Cloud APIs ==========
+  
   try {
-    // Try Supabase Edge Function first (handles CORS)
+    // First: Try Puter.com AI API (FREE, simple)
+    console.log('[AssetGen] Attempting Puter.com AI...');
+    return await generateWithPuter(prompt);
+  } catch (puterError) {
+    console.warn('[AssetGen] Puter.com failed:', puterError);
+  }
+
+  try {
+    // Second: Try Supabase Edge Function (handles CORS)
     console.log('[AssetGen] Attempting Edge Function...');
     return await generateWithEdgeFunction(prompt);
   } catch (edgeError) {
@@ -544,37 +529,31 @@ export async function generateDreamImage(prompt: string): Promise<DreamAsset> {
   }
 
   try {
-    // Fallback: Direct Pollinations (may have CORS issues in some browsers)
+    // Third: Direct Pollinations (may have CORS issues in some browsers)
     console.log('[AssetGen] Attempting Pollinations direct...');
     return await generateWithPollinations(prompt);
   } catch (pollinationsError) {
     console.warn('[AssetGen] Pollinations failed:', pollinationsError);
   }
 
-  try {
-    // Third option: Fal AI (fast & cheap, requires API key)
-    console.log('[AssetGen] Attempting Fal AI...');
-    return await generateWithFalAI(prompt);
-  } catch (falError) {
-    console.warn('[AssetGen] Fal AI failed:', falError);
+  // ========== STAGE 2: Local Generation (Optional) ==========
+  
+  const enableLocal = import.meta.env.VITE_ENABLE_LOCAL_GEN === 'true';
+  
+  if (enableLocal) {
+    try {
+      // Fourth: Local generation (ComfyUI or A1111)
+      console.log('[AssetGen] Attempting local provider...');
+      return await generateWithLocalProvider(prompt);
+    } catch (localError) {
+      console.warn('[AssetGen] Local provider failed:', localError);
+    }
+  } else {
+    console.log('[AssetGen] Local generation disabled (set VITE_ENABLE_LOCAL_GEN=true to enable)');
   }
 
-  try {
-    // Fourth option: Local generation (ComfyUI or A1111)
-    console.log('[AssetGen] Attempting local provider...');
-    return await generateWithLocalProvider(prompt);
-  } catch (localError) {
-    console.warn('[AssetGen] Local provider failed:', localError);
-  }
-
-  try {
-    // Fifth option: HuggingFace
-    console.log('[AssetGen] Attempting HuggingFace...');
-    return await generateWithHuggingFace(prompt);
-  } catch (hfError) {
-    console.warn('[AssetGen] HuggingFace failed:', hfError);
-  }
-
+  // ========== FALLBACK ==========
+  
   // Final fallback: SVG placeholder
   console.warn('[AssetGen] All providers failed, using SVG placeholder');
   return await generateFallbackImage(prompt);

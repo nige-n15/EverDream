@@ -3,6 +3,7 @@
 node_modules/
 
 # Build outputs
+# Build artifacts
 dist/
 build/
 target/
@@ -28,6 +29,11 @@ venv/
 .pytest_cache/
 .mypy_cache/
 .hypothesis/
+# Dependency directories
+.jest/
+.nyc_output/
+coverage/
+.nyc_output/
 
 # Logs
 *.log
@@ -50,6 +56,7 @@ Thumbs.db:encryptable
 *.swo
 
 # Environment specific
+# Environment variables
 .env
 .env.local
 .env.*
@@ -65,6 +72,19 @@ nbproject/
 *.zip
 *.tar
 *.gz
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temp files
+*.tmp
+*.swp
+
+# Compressed files
+*.zip
+*.gz
+*.tar
 *.tgz
 *.bz2
 *.xz
@@ -112,4 +132,14 @@ docs/_build/
 .tox/
 .nox/
 .cover/
+*.rpm
+*.deb
+*.Z
+*.lz
+*.lzo
+*.tar.gz
+*.tar.bz2
+*.tar.xz
+*.tar.zst
+
 ```

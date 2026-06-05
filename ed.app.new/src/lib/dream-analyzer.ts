@@ -260,18 +260,14 @@ function validateAndNormalizeAnalysis(analysis: Partial<DreamAnalysis>): DreamAn
 /**
  * Analyze a dream text using AI.
  *
- * Tries Supabase Edge Function first (which handles multi-provider fallback),
- * then falls back to direct Anthropic API for development.
+ * Uses Supabase Edge Function only - all API keys are server-side.
+ * Direct Anthropic API calls have been removed for security.
  *
  * @param text — The dream text to analyze (minimum 10 characters)
  * @returns Parsed DreamAnalysis, or fallback on failure
  *
- * @example
- * ```ts
- * const analysis = await analyzeDream('I was flying over a vast ocean...');
- * console.log(analysis.category); // 'adventure'
- * console.log(analysis.themes);   // ['freedom', 'exploration', 'water']
- * ```
+ * SECURITY FIX: Removed direct Anthropic API fallback that exposed API keys.
+ * All AI analysis now goes through Supabase Edge Functions only.
  */
 export async function analyzeDream(text: string): Promise<DreamAnalysis> {
   console.log('[DreamAnalyzer] ========== DREAM ANALYSIS STARTED ==========');
@@ -293,7 +289,7 @@ export async function analyzeDream(text: string): Promise<DreamAnalysis> {
   const safeText = trimmed.length > 10000 ? trimmed.substring(0, 10000) : trimmed;
   console.log('[DreamAnalyzer] Safe text length after truncation:', safeText.length);
 
-  // Try Supabase Edge Function first
+  // Try Supabase Edge Function ONLY - no direct API fallbacks
   try {
     console.log('[DreamAnalyzer] Attempt 1: Trying Supabase Edge Function...');
     const result = await analyzeViaEdgeFunction(safeText);
@@ -304,19 +300,11 @@ export async function analyzeDream(text: string): Promise<DreamAnalysis> {
     console.warn('[DreamAnalyzer] ✗ Edge function failed:', err instanceof Error ? err.message : String(err));
   }
 
-  // Fallback: direct Anthropic API
-  try {
-    console.log('[DreamAnalyzer] Attempt 2: Trying direct Anthropic API...');
-    const result = await analyzeViaAnthropic(safeText);
-    console.log('[DreamAnalyzer] ✓ Anthropic fallback succeeded');
-    console.log('[DreamAnalyzer] ========== DREAM ANALYSIS COMPLETED ==========');
-    return result;
-  } catch (err) {
-    console.warn('[DreamAnalyzer] ✗ Anthropic fallback failed:', err instanceof Error ? err.message : String(err));
-  }
-
-  // All methods failed — return fallback
-  console.error('[DreamAnalyzer] ✗ All analysis methods failed, returning fallback');
+  // SECURITY FIX: Removed direct Anthropic API fallback
+  // All AI calls must go through Supabase Edge Functions to protect API keys
+  
+  // Return fallback analysis if edge function fails
+  console.error('[DreamAnalyzer] ✗ Analysis failed, returning fallback');
   console.log('[DreamAnalyzer] ========== DREAM ANALYSIS COMPLETED (FALLBACK) ==========');
   return { ...FALLBACK_ANALYSIS, narrative: safeText, nugget: safeText.substring(0, 100) };
 }

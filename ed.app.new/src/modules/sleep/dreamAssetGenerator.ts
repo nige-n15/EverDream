@@ -613,6 +613,39 @@ export async function generateDreamImage(
 
 // ── Exports ──────────────────────────────────────────────────
 
+/**
+ * Generate multiple dream assets (images) for a given dream text.
+ * Calls generateDreamImage multiple times to create variations.
+ * 
+ * @param dreamText - The dream description to generate images for
+ * @param count - Number of images to generate (default: 1)
+ * @param style - The art style for generation (default: 'dreamlike')
+ * @returns Promise resolving to an array of DreamAsset objects
+ */
+export async function generateDreamAssets(
+  dreamText: string,
+  count: number = 1,
+  style: string = 'dreamlike'
+): Promise<DreamAsset[]> {
+  console.log(`[AssetGen] Generating ${count} dream asset(s) for:`, dreamText.substring(0, 50));
+  
+  const assets: DreamAsset[] = [];
+  
+  for (let i = 0; i < count; i++) {
+    try {
+      console.log(`[AssetGen] Generating asset ${i + 1}/${count}...`);
+      const asset = await generateDreamImage(dreamText, style);
+      assets.push(asset);
+    } catch (error) {
+      console.error(`[AssetGen] Failed to generate asset ${i + 1}:`, error instanceof Error ? error.message : error);
+      // Continue generating remaining assets even if one fails
+    }
+  }
+  
+  console.log(`[AssetGen] Successfully generated ${assets.length}/${count} assets`);
+  return assets;
+}
+
 export {
   generateWithPrimaryService,
   generateWithSecondaryService,
@@ -623,4 +656,6 @@ export {
   generateSimpleSVGPlaceholder,
   buildDreamPrompt,
   validateImageUrl,
+  generateDreamImage,
+  generateDreamAssets,
 };

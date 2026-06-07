@@ -656,6 +656,4 @@ export {
   generateSimpleSVGPlaceholder,
   buildDreamPrompt,
   validateImageUrl,
-  generateDreamImage,
-  generateDreamAssets,
 };

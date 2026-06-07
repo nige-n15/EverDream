@@ -1,0 +1,21 @@
+# Keep the build context small and prevent secrets/cruft leaking in
+node_modules
+node_modules.*
+dist
+build
+
+# Never copy env files into the image (they could leak secrets into the bundle)
+.env
+.env.*
+!.env.example
+
+.git
+.gitignore
+*.log
+legacy
+expo
+vscode-agent
+**/*.md
+.vscode
+.cursor
+coverage

@@ -4,7 +4,8 @@
  * Simple health check endpoint for monitoring.
  * Returns status of all edge functions and their configuration.
  *
- * No authentication required — used by Night Watchdog for monitoring.
+ * Requires a valid JWT (verify_jwt = true) — callers (incl. the Night
+ * Watchdog monitor) must send the project's anon key as a Bearer token.
  *
  * Response:
  *   { status: "ok", functions: { name, configured: boolean }[], timestamp: string }
@@ -42,13 +43,15 @@ serve(async (req: Request): Promise<Response> => {
     {
       name: 'analyze-dream',
       configured: true,
+      // OPENROUTER_API_KEY is the primary; the rest are optional fallbacks.
       requiredSecrets: ['OPENROUTER_API_KEY'],
       missingSecrets: [],
     },
     {
       name: 'generate-image',
       configured: true,
-      requiredSecrets: [],
+      // HF_INFERENCE_API_KEY is the primary; FAL_AI_KEY is an optional fallback.
+      requiredSecrets: ['HF_INFERENCE_API_KEY'],
       missingSecrets: [],
     },
     {

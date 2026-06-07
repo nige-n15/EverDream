@@ -61,18 +61,30 @@ Dashboard → **Project Settings → API**:
    `ed_analytics_sessions`, `ed_performance_metrics`).
 
 ### 1.3 Deploy the edge functions (JWT-protected)
+
+Install the CLI if needed (`brew install supabase/tap/supabase`, `scoop install
+supabase`, or prefix commands with `npx supabase`). No Docker required — this
+uploads to the hosted project. Your `<project-ref>` is the part before
+`.supabase.co` in your URL.
+
 ```bash
 cd ed.app.new
 supabase login
-supabase link --project-ref <your-project-ref>
 
-# Deploys with verify_jwt = true (from supabase/config.toml).
-# Callers must send the anon key as a Bearer token — the browser app does
-# this automatically via supabase.functions.invoke().
-bash supabase/deploy.sh
+# Deploy all four functions. Using --project-ref skips `supabase link`
+# (and its DB-password prompt), which isn't needed just to deploy functions.
+bash supabase/deploy.sh <your-project-ref>
 ```
-`deploy.sh` deploys all four functions: `analyze-dream`, `generate-image`,
-`transcribe-audio`, `health-check`.
+
+That deploys `analyze-dream`, `generate-image`, `transcribe-audio`, and
+`health-check` with `verify_jwt = true` (from `supabase/config.toml`). Callers
+must send the anon key as a Bearer token — the browser app does this
+automatically via `supabase.functions.invoke()`.
+
+Prefer to deploy one at a time? Each is just:
+```bash
+supabase functions deploy analyze-dream --project-ref <your-project-ref>
+```
 
 ### 1.4 Set the server-side secrets
 

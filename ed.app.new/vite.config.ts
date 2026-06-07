@@ -50,4 +50,7 @@ export default defineConfig({
     port: 5173,
     allowedHosts: ['.ngrok-free.dev'],
   },
+  optimizeDeps: {
+    exclude: ['@supabase/supabase-js', 'tesseract.js'],
+  },
 });

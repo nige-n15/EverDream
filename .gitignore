@@ -1,6 +1,7 @@
-```
 # Dependencies
 node_modules/
+# stray node_modules backup copies (node_modules.broken, .bak, .wsl, etc.)
+node_modules.*/
 
 # Build outputs
 dist/
@@ -84,4 +85,3 @@ dmypy.json
 *.tar.bz2
 *.tar.xz
 *.tar.zst
-```

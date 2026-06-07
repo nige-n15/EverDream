@@ -143,6 +143,9 @@ async function syncEvents(): Promise<SyncResult> {
 
   if (eventsToSync.length === 0) return { synced: 0, errors: 0 };
 
+  const client = await getSupabase();
+  if (!client) return { synced: 0, errors: 1 };
+
   let synced = 0;
   let errors = 0;
   let lastId = meta.lastEventId;
@@ -161,7 +164,7 @@ async function syncEvents(): Promise<SyncResult> {
       ab_test_variant: e.abTestVariant || null,
     }));
 
-    const { error } = await supabase.from('ed_analytics_events').upsert(batch, { onConflict: 'id' });
+    const { error } = await client.from('ed_analytics_events').upsert(batch, { onConflict: 'id' });
     if (error) {
       errors++;
     } else {
@@ -188,6 +191,9 @@ async function syncSessions(): Promise<SyncResult> {
 
   if (sessionsToSync.length === 0) return { synced: 0, errors: 0 };
 
+  const client = await getSupabase();
+  if (!client) return { synced: 0, errors: 1 };
+
   let synced = 0;
   let errors = 0;
   let lastId = meta.lastSessionId;
@@ -204,7 +210,7 @@ async function syncSessions(): Promise<SyncResult> {
       ab_tests: s.abTests || [],
     }));
 
-    const { error } = await supabase.from('ed_analytics_sessions').upsert(batch, { onConflict: 'id' });
+    const { error } = await client.from('ed_analytics_sessions').upsert(batch, { onConflict: 'id' });
     if (error) {
       errors++;
     } else {
@@ -231,6 +237,9 @@ async function syncPerformanceMetrics(): Promise<SyncResult> {
 
   if (metricsToSync.length === 0) return { synced: 0, errors: 0 };
 
+  const client = await getSupabase();
+  if (!client) return { synced: 0, errors: 1 };
+
   let synced = 0;
   let errors = 0;
   let lastId = meta.lastMetricId;
@@ -248,7 +257,7 @@ async function syncPerformanceMetrics(): Promise<SyncResult> {
       metadata: m.metadata || {},
     }));
 
-    const { error } = await supabase.from('ed_performance_metrics').upsert(batch, { onConflict: 'id' });
+    const { error } = await client.from('ed_performance_metrics').upsert(batch, { onConflict: 'id' });
     if (error) {
       errors++;
     } else {
@@ -311,15 +320,20 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
 }
 
 async function getAdminDataFromSupabase(meta: SyncMeta): Promise<AdminDashboardData> {
+  const client = await getSupabase();
+  if (!client) {
+    throw new Error('Supabase client not initialized');
+  }
+
   // Run queries in parallel
   const [
     eventsResult,
     sessionsResult,
     metricsResult,
   ] = await Promise.all([
-    supabase.from('ed_analytics_events').select('id, type, name, timestamp, session_id, screen', { count: 'exact' }),
-    supabase.from('ed_analytics_sessions').select('id, started_at, duration, screens, event_count', { count: 'exact' }),
-    supabase.from('ed_performance_metrics').select('id, type, name, value, unit, timestamp, metadata'),
+    client.from('ed_analytics_events').select('id, type, name, timestamp, session_id, screen', { count: 'exact' }),
+    client.from('ed_analytics_sessions').select('id, started_at, duration, screens, event_count', { count: 'exact' }),
+    client.from('ed_performance_metrics').select('id, type, name, value, unit, timestamp, metadata'),
   ]);
 
   const events = eventsResult.data || [];

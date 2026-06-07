@@ -75,6 +75,23 @@ bash supabase/deploy.sh
 `transcribe-audio`, `health-check`.
 
 ### 1.4 Set the server-side secrets
+
+**What these are:** environment variables attached to your Supabase **edge
+functions**. They are stored encrypted on Supabase's platform — *not* in this
+repo, *not* in Coolify, and *not* in the browser bundle. Each function reads
+them at runtime via `Deno.env.get(...)`.
+
+**Where to run the commands:** on **your own machine** (the same place you ran
+`supabase login` / `supabase link` in step 1.3). They use the Supabase CLI to
+push the values up to your project over the Supabase API.
+
+> ❗ Do **not** run these on the Coolify server, and do **not** add them as
+> Coolify environment variables. Coolify only builds/serves the static
+> frontend — it has nothing to do with the edge functions or these keys.
+> (Coolify only gets the two public `VITE_SUPABASE_*` values — see Part 2.)
+
+#### Option A — Supabase CLI (recommended)
+From `ed.app.new/`, with the project already linked (step 1.3):
 ```bash
 # Required
 supabase secrets set OPENROUTER_API_KEY=sk-or-v1-...   # dream analysis
@@ -88,8 +105,19 @@ supabase secrets set NVIDIA_API_KEY=nvapi-...
 # Optional image fallback
 supabase secrets set FAL_AI_KEY=...
 
-supabase secrets list   # confirm
+supabase secrets list   # confirm what's set (values are masked)
 ```
+You can also load many at once from a file:
+`supabase secrets set --env-file ./secrets.env` (keep that file out of git).
+
+#### Option B — Supabase Dashboard (no CLI)
+Dashboard → **Edge Functions → Secrets** (a.k.a. *Project Settings → Edge
+Functions → Secrets / Environment variables*). Add each name/value pair there
+and **Save**.
+
+> Secrets apply to functions that are already deployed — **no redeploy needed**.
+> Give it a few seconds to propagate, then re-run the health check in Part 3
+> (it reports `degraded` until the required secrets are present).
 
 | Provider | Get a key | Free tier |
 |---|---|---|

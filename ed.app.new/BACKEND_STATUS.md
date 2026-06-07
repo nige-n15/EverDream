@@ -63,8 +63,8 @@ All tables have RLS enabled with user-specific policies.
 ## What Needs Deployment
 
 ### 1. Database Migration
-The consolidated schema is at `supabase/migrations/20250520000001_complete_schema.sql`.
-Run: `supabase db push`
+The consolidated schema is at `supabase/migrations/001_consolidated_schema.sql`.
+Run it in the Supabase SQL Editor (idempotent). See `DEPLOY.md` for the full runbook.
 
 ### 2. Edge Function Secrets
 Required:

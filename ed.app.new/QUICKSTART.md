@@ -20,7 +20,7 @@ cp .env.example .env
 ```
 
 ### 3. Create Database Tables
-Run the SQL in `supabase/migrations/001_initial_schema.sql` in your Supabase SQL Editor.
+Run the SQL in `supabase/migrations/001_consolidated_schema.sql` in your Supabase SQL Editor. See `DEPLOY.md` for the full runbook.
 
 ### 4. Deploy Edge Functions
 ```bash
@@ -89,7 +89,7 @@ supabase/
 │   ├── analyze-dream/    # Multi-provider dream analysis
 │   └── generate-image/   # Pollinations image proxy
 └── migrations/
-    └── 001_initial_schema.sql  # Database schema
+    └── 001_consolidated_schema.sql  # Database schema
 ```
 
 ## Success Criteria (by 08:00)

@@ -1,4 +1,3 @@
-```
 # Dependencies
 node_modules/
 
@@ -84,4 +83,31 @@ dmypy.json
 *.tar.bz2
 *.tar.xz
 *.tar.zst
-```
+
+# Large binary files
+*.node
+*.wasm
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Backup/duplicate directories
+*.bak/
+*.broken/
+*.wsl/
+
+# Expo / React Native
+.expo/
+.expo-shared/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+web-build/
+
+# OS
+.DS_Store
+Thumbs.db

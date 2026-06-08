@@ -49,7 +49,7 @@ import { TermsModal } from './components/modal';
 import { getOrCreateWallet, createDreamNFT, mintNFT, saveNFT, type DreamNFT, type WalletIdentity } from './lib/nft';
 import DreamVisualizer from './components/dreams/DreamVisualizer';
 import DreamCapture from './components/dreams/DreamCapture';
-import { VideoJournalScreen } from './screens/VideoJournalScreen';
+import { VideoCaptureFlow } from './components/VideoCaptureFlow';
 import { analyzeDream, type DreamAnalysis } from './lib/dream-analyzer';
 import type { DreamAsset } from './modules/sleep/types';
 
@@ -2022,11 +2022,17 @@ const DreamJournalApp = () => {
         </div>
       )}
 
-      {/* Video Journal Screen */}
+      {/* Video Capture (full-screen camera with emotion detection) */}
       {route.screen === 'video-journal' && (
-        <VideoJournalScreen
-          onComplete={async (videoUrl, thumbnailUrl, duration) => {
-            // Create a dream entry from video journal
+        <VideoCaptureFlow
+          enableAudio
+          onComplete={async (data) => {
+            // Adapt VideoCaptureFlow output (blob) to the video-dream save path
+            const videoUrl = URL.createObjectURL(data.videoBlob);
+            const thumbnailUrl = data.thumbnail ?? null;
+            const duration = Math.round(data.duration);
+
+            // Create a dream entry from the video capture
             const newDream = {
               id: `dream-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
               date: new Date().toISOString(),

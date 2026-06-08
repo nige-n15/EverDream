@@ -49,7 +49,8 @@ import { TermsModal } from './components/modal';
 import { getOrCreateWallet, createDreamNFT, mintNFT, saveNFT, type DreamNFT, type WalletIdentity } from './lib/nft';
 import DreamVisualizer from './components/dreams/DreamVisualizer';
 import DreamCapture from './components/dreams/DreamCapture';
-import { VideoJournalScreen } from './screens/VideoJournalScreen';
+import { VideoCaptureFlow } from './components/VideoCaptureFlow';
+import { saveVideo, clearAllVideos } from './lib/storage/videoStore';
 import { analyzeDream, type DreamAnalysis } from './lib/dream-analyzer';
 import type { DreamAsset } from './modules/sleep/types';
 
@@ -1319,6 +1320,9 @@ const DreamJournalApp = () => {
       await window.storage.delete('sleep_privacy_consent');
       await window.storage.delete('sleep_completed_sessions');
 
+      // Remove persisted video blobs (stored in a separate IndexedDB)
+      await clearAllVideos();
+
       // Reset state
       setDreams([]);
       setWearableData([]);
@@ -2022,13 +2026,24 @@ const DreamJournalApp = () => {
         </div>
       )}
 
-      {/* Video Journal Screen */}
+      {/* Video Capture (full-screen camera with emotion detection) */}
       {route.screen === 'video-journal' && (
-        <VideoJournalScreen
-          onComplete={async (videoUrl, thumbnailUrl, duration) => {
-            // Create a dream entry from video journal
+        <VideoCaptureFlow
+          enableAudio
+          onComplete={async (data) => {
+            // Persist the recorded video to IndexedDB so it survives reloads,
+            // then reference it from the dream via an "idb:<id>" marker.
+            const dreamId = `dream-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+            const thumbnailUrl = data.thumbnail ?? null;
+            const duration = Math.round(data.duration);
+            const videoRef = await saveVideo(dreamId, data.videoBlob, {
+              thumbnail: thumbnailUrl,
+              duration,
+            });
+
+            // Create a dream entry from the video capture
             const newDream = {
-              id: `dream-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+              id: dreamId,
               date: new Date().toISOString(),
               content: 'Video journal entry - watch to hear the dream details',
               category: 'video-journal',
@@ -2044,7 +2059,7 @@ const DreamJournalApp = () => {
               },
               captureMode: 'video',
               videoCapture: {
-                url: videoUrl,
+                url: videoRef,
                 capturedAt: new Date().toISOString(),
                 duration: duration,
               },

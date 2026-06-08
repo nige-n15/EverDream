@@ -3,8 +3,8 @@ import {
   CalendarDays,
   Menu,
   Moon,
-  Settings,
   Sparkles,
+  User,
 } from 'lucide-react';
 import type { RouteScreen } from '../hooks/useHashRoute';
 import { useSkinFull } from '../contexts/SkinContext';
@@ -12,7 +12,7 @@ import { useSkinFull } from '../contexts/SkinContext';
 type ShellProps = {
   active: RouteScreen;
   onNavigate: (screen: RouteScreen) => void;
-  onOpenSettings: () => void;
+  onOpenProfile: () => void;
   children: React.ReactNode;
 };
 
@@ -38,7 +38,7 @@ function isNavActive(active: RouteScreen, screen: RouteScreen): boolean {
   return active === screen;
 }
 
-export default function Shell({ active, onNavigate, onOpenSettings, children }: ShellProps) {
+export default function Shell({ active, onNavigate, onOpenProfile, children }: ShellProps) {
   const { isPearl } = useSkinFull();
   const dreamTarget = getDreamButtonTarget(active);
 
@@ -74,11 +74,11 @@ export default function Shell({ active, onNavigate, onOpenSettings, children }: 
           </div>
           <button
             type="button"
-            onClick={onOpenSettings}
+            onClick={onOpenProfile}
             className={`p-2.5 rounded-full border transition-colors shrink-0 ${isPearl ? 'border-[var(--glass-border)] bg-[var(--glass-bg)] hover:bg-white/80' : 'border-line bg-cream hover:bg-parchment'}`}
-            aria-label="Settings"
+            aria-label="Profile"
           >
-            <Settings className="w-5 h-5 text-muted" strokeWidth={1.5} />
+            <User className="w-5 h-5 text-muted" strokeWidth={1.5} />
           </button>
         </div>
       </header>

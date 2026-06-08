@@ -52,6 +52,9 @@ import DreamCapture from './components/dreams/DreamCapture';
 import { VideoJournalScreen } from './screens/VideoJournalScreen';
 import { analyzeDream, type DreamAnalysis } from './lib/dream-analyzer';
 import type { DreamAsset } from './modules/sleep/types';
+import { initDreamService, syncFromSupabase } from './lib/dreamService';
+import { supabase as supabaseClient } from './lib/supabase/client';
+import { getCurrentUser } from './lib/supabase/client';
 
 const DreamJournalApp = () => {
   const { route, navigate } = useHashRoute();
@@ -358,6 +361,25 @@ const DreamJournalApp = () => {
       }
     };
     loadData();
+
+    // Initialize Supabase (async, non-blocking)
+    initDreamService().then((supabaseReady) => {
+      if (supabaseReady) {
+        console.log('[App] Supabase initialized — syncing from cloud');
+        syncFromSupabase().then((merged) => {
+          if (merged > 0) {
+            console.log(`[App] Merged ${merged} dreams from Supabase`);
+            // Reload from local storage (now updated by syncFromSupabase)
+            try {
+              const raw = localStorage.getItem('everdream_dreams');
+              if (raw) setDreams(JSON.parse(raw));
+            } catch { /* ignore */ }
+          }
+        });
+      } else {
+        console.log('[App] Supabase not configured — local mode only');
+      }
+    });
     // Signal loading complete after data is fetched
     const loadingTimer = setTimeout(() => {
       setIsAppLoading(false);
@@ -380,6 +402,65 @@ const DreamJournalApp = () => {
   useEffect(() => {
     trackScreenView(route.screen);
   }, [route.screen]);
+
+  // Save dreams to Supabase cloud (non-blocking helper)
+  const syncDreamToSupabase = async (dream: Dream): Promise<void> => {
+    try {
+      const user = await getCurrentUser();
+      if (!user) return; // not logged in, skip cloud sync
+
+      // Get or create profile
+      const { data: profile } = await supabaseClient
+        .from('profiles')
+        .select('id')
+        .eq('auth_user_id', user.id)
+        .single();
+
+      const userId = profile?.id;
+      if (!userId) {
+        console.warn('[Supabase] No profile found for user, skipping cloud sync');
+        return;
+      }
+
+      const record = {
+        id: dream.id,
+        user_id: userId,
+        content: dream.content,
+        category: dream.category || 'uncategorized',
+        themes: dream.themes || [],
+        emotion: dream.emotion || 'neutral',
+        symbols: dream.symbols || [],
+        narrative: dream.narrative || null,
+        nugget: dream.nugget || null,
+        interpretation: dream.interpretation || null,
+        mood_valence: dream.moodValence ?? null,
+        capture_mode: dream.captureMode || 'text',
+        generated_image_url: dream.generatedImage?.url || null,
+        generated_image_prompt: dream.generatedImage?.prompt || null,
+        generated_image_style: dream.generatedImage?.style || null,
+        generated_image_source: dream.generatedImage?.source || null,
+        visibility: 'private',
+        is_sample: dream.isSample || false,
+        is_deleted: false,
+        local_created_at: dream.date,
+        local_updated_at: new Date().toISOString(),
+        video_capture: dream.videoCapture || null,
+        source_audio: dream.audioFile || null,
+        context: dream.context || null,
+        sleep_data: dream.sleepData || null,
+      };
+
+      const { error } = await supabaseClient.from('dreams').upsert(record);
+      if (error) {
+        console.error('[Supabase] upsert error:', error);
+      } else {
+        console.log('[Supabase] Dream synced:', dream.id);
+      }
+    } catch (err) {
+      console.error('[Supabase] sync error:', err);
+      throw err;
+    }
+  };
 
   // Save dreams
   const saveDreamsToStorage = async (dreamsToSave: Dream[]) => {
@@ -945,7 +1026,12 @@ const DreamJournalApp = () => {
     console.log('[SaveDream] Saving to storage...');
     await saveDreamsToStorage(updatedDreams);
     console.log('[SaveDream] Storage save complete');
-    
+
+    // Sync to Supabase (non-blocking)
+    syncDreamToSupabase(newDream).catch((err: unknown) => {
+      console.warn('[SaveDream] Supabase sync error:', err);
+    });
+
     await checkAchievements(updatedDreams);
     
     setCurrentEntry('');
@@ -1024,6 +1110,13 @@ const DreamJournalApp = () => {
     setDreams(updatedDreams);
     await saveDreamsToStorage(updatedDreams);
     await checkAchievements(updatedDreams);
+
+    // Sync imported dreams to Supabase (non-blocking)
+    for (const nd of newDreams) {
+      syncDreamToSupabase(nd).catch((err: unknown) => {
+        console.warn('[PhotoImport] Supabase sync error:', err);
+      });
+    }
 
     setShowAchievement({
       id: 'photo_import',
@@ -2014,6 +2107,11 @@ const DreamJournalApp = () => {
               setDreams(updatedDreams);
               await saveDreamsToStorage(updatedDreams);
 
+              // Sync to Supabase (non-blocking)
+              syncDreamToSupabase(newDream).catch((err: unknown) => {
+                console.warn('[RecordScreen] Supabase sync error:', err);
+              });
+
               // Navigate to the new dream detail
               navigate('dream', newDream.id);
             }}
@@ -2064,6 +2162,11 @@ const DreamJournalApp = () => {
             const updatedDreams = [newDream, ...dreams];
             setDreams(updatedDreams);
             await saveDreamsToStorage(updatedDreams);
+
+            // Sync to Supabase (non-blocking)
+            syncDreamToSupabase(newDream).catch((err: unknown) => {
+              console.warn('[VideoJournal] Supabase sync error:', err);
+            });
 
             // Navigate to the new dream detail
             navigate('dream', newDream.id);

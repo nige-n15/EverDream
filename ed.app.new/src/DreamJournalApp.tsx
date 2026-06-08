@@ -46,6 +46,7 @@ import { trackScreenView, startSession, endSession } from './lib/analytics';
 import { initPerformanceMonitor, startAPICall, endAPICall } from './lib/performance';
 import { AppLoadingScreen, ErrorBanner, LoadingOverlay } from './components/ui';
 import { TermsModal } from './components/modal';
+import { ProfileHub } from './screens/ProfileHubScreen';
 import { getOrCreateWallet, createDreamNFT, mintNFT, saveNFT, type DreamNFT, type WalletIdentity } from './lib/nft';
 import DreamVisualizer from './components/dreams/DreamVisualizer';
 import DreamCapture from './components/dreams/DreamCapture';
@@ -138,7 +139,7 @@ const DreamJournalApp = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [currentEntry, setCurrentEntry] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
   const [settings, setSettings] = useState({
     alarmTime: '07:00',
     alarmEnabled: true,
@@ -1540,7 +1541,7 @@ const DreamJournalApp = () => {
     <Shell
       active={route.screen}
       onNavigate={navigate}
-      onOpenSettings={() => setShowSettings(true)}
+      onOpenProfile={() => setShowProfile(true)}
     >
       {hasAcceptedTerms && (
         <div className="mb-6 rounded-2xl border border-line bg-parchment/90 px-4 py-3 flex flex-wrap items-center justify-between gap-3 text-sm text-muted shadow-paper">
@@ -2724,105 +2725,9 @@ const DreamJournalApp = () => {
         </Modal>
       )}
 
-      {/* Settings Modal */}
-      {showSettings && (
-        <Modal onClose={() => setShowSettings(false)}>
-          <h2 className="text-xl font-semibold mb-4">Settings</h2>
-
-          <div className="space-y-4">
-            {/* Wearable Sync - link to full page */}
-            <button
-              type="button"
-              onClick={() => {
-                setShowSettings(false);
-                navigate('wearables');
-              }}
-              className="w-full flex items-center justify-between rounded-xl border border-line bg-cream px-4 py-3 text-left hover:bg-parchment transition"
-            >
-              <div>
-                <span className="font-medium text-ink">Wearable Devices</span>
-                <p className="text-xs text-muted mt-0.5">
-                  {wearableConfigs.filter(c => c.enabled && c.auth.accessToken).length} connected
-                </p>
-              </div>
-              <ChevronRight className="w-4 h-4 text-muted" strokeWidth={1.75} />
-            </button>
-
-            <div className="flex items-center justify-between">
-              <span>Image Generation</span>
-              <button
-                onClick={() => {
-                  const newSettings = {...settings, imageGeneration: !settings.imageGeneration};
-                  setSettings(newSettings);
-                  saveSettingsToStorage(newSettings);
-                }}
-                className={`w-12 h-7 rounded-full transition ${settings.imageGeneration ? 'bg-purple-600' : 'bg-gray-600'}`}
-              >
-                <div className={`w-5 h-5 bg-white rounded-full transition transform ${settings.imageGeneration ? 'translate-x-6' : 'translate-x-1'}`} />
-              </button>
-            </div>
-
-            <div className="bg-purple-600 bg-opacity-20 p-3 rounded-lg">
-              <div className="text-sm text-purple-200 mb-2">Stored Data:</div>
-              <div className="text-xs text-white space-y-1">
-                <div>Dreams: {dreams.filter(d => !d.isSample).length}</div>
-                <div>With Images: {dreams.filter(d => !d.isSample && d.generatedImage).length}</div>
-                <div>Wearable Sessions: {wearableData.length}</div>
-                <div>Achievements: {achievements.length}</div>
-                <div className="text-green-300 mt-2">✓ All stored locally on your device</div>
-              </div>
-            </div>
-
-            <div className="border-t border-white border-opacity-20 pt-4 space-y-2">
-              <button
-                onClick={() => {
-                  setShowSettings(false);
-                  navigate('privacy');
-                }}
-                className="w-full bg-green-600 hover:bg-green-700 py-3 rounded-lg transition flex items-center justify-center gap-2"
-              >
-                <Shield className="w-4 h-4" />
-                Privacy & Data Controls
-              </button>
-
-              <button
-                onClick={() => {
-                  setShowSettings(false);
-                  setShowLicensing(true);
-                }}
-                className="w-full bg-blue-600 hover:bg-blue-700 py-3 rounded-lg transition"
-              >
-                Open Source Licensing
-              </button>
-
-              <button
-                onClick={() => {
-                  setShowSettings(false);
-                  setShowTerms(true);
-                }}
-                className="w-full bg-purple-600 hover:bg-purple-700 py-3 rounded-lg transition"
-              >
-                Terms & Conditions
-              </button>
-            </div>
-
-            <button 
-              onClick={exportAllData}
-              className="w-full bg-cyan-600 hover:bg-cyan-700 py-3 rounded-lg transition flex items-center justify-center gap-2"
-            >
-              <Download className="w-4 h-4" />
-              Export All Data (GDPR)
-            </button>
-            
-            <button 
-              onClick={deleteAllUserData}
-              className="w-full bg-red-600 hover:bg-red-700 py-3 rounded-lg transition flex items-center justify-center gap-2"
-            >
-              <X className="w-4 h-4" />
-              Delete All Data (GDPR Article 17)
-            </button>
-          </div>
-        </Modal>
+      {/* Profile Hub Modal */}
+      {showProfile && (
+        <ProfileHub onClose={() => setShowProfile(false)} navigate={navigate} />
       )}
 
       {/* Share Modal */}

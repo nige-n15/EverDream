@@ -1,5 +1,6 @@
 import { ArrowLeft, Upload, Award, Shield, Eye, Camera, MessageCircle } from 'lucide-react';
 import DreamVisualizer from '../components/dreams/DreamVisualizer';
+import { IdbVideo } from '../components/dreams/IdbVideo';
 import type { EmotionCapture } from './face/FacialEmotionDetector';
 
 interface DreamInterpretation {
@@ -162,9 +163,8 @@ export function DreamDetailScreen({
                 <span>Video journal entry</span>
               </div>
               <div className="rounded-2xl border border-line bg-black overflow-hidden">
-                <video
+                <IdbVideo
                   src={detailDream.videoCapture.url}
-                  controls
                   className="w-full"
                   poster={detailDream.generatedImage?.url}
                 />

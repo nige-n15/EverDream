@@ -70,7 +70,7 @@ CREATE TABLE IF NOT EXISTS public.dreams (
   generated_image_prompt TEXT,
   generated_image_style TEXT DEFAULT 'dreamlike',
   generated_image_source TEXT,
-  sleep_session_id UUID REFERENCES public.sleep_sessions(id) ON DELETE SET NULL,
+  sleep_session_id UUID, -- FK to public.sleep_sessions added after that table is created (avoids circular dependency)
   sleep_score INTEGER CHECK (sleep_score BETWEEN 0 AND 100),
   sleep_duration_minutes INTEGER,
   rem_minutes INTEGER,
@@ -168,6 +168,13 @@ CREATE INDEX IF NOT EXISTS idx_sleep_sessions_user_id ON public.sleep_sessions(u
 CREATE INDEX IF NOT EXISTS idx_sleep_sessions_sleep_start ON public.sleep_sessions(sleep_start DESC);
 CREATE INDEX IF NOT EXISTS idx_sleep_sessions_is_deleted ON public.sleep_sessions(is_deleted);
 CREATE INDEX IF NOT EXISTS idx_sleep_sessions_expires_at ON public.sleep_sessions(expires_at);
+
+-- Deferred FK: dreams.sleep_session_id -> sleep_sessions.id
+-- (declared here because dreams is created before sleep_sessions; idempotent)
+ALTER TABLE public.dreams DROP CONSTRAINT IF EXISTS dreams_sleep_session_id_fkey;
+ALTER TABLE public.dreams
+  ADD CONSTRAINT dreams_sleep_session_id_fkey
+  FOREIGN KEY (sleep_session_id) REFERENCES public.sleep_sessions(id) ON DELETE SET NULL;
 
 ALTER TABLE public.sleep_sessions ENABLE ROW LEVEL SECURITY;
 
@@ -506,3 +513,68 @@ BEGIN
   DELETE FROM public.webhook_events WHERE status = 'sent' AND created_at < NOW() - INTERVAL '7 days';
 END;
 $$ LANGUAGE plpgsql;
+
+-- ============================================================
+-- 13. ANALYTICS TABLES (used by src/lib/analytics-sync.ts)
+-- ============================================================
+-- Columns mirror the upsert payloads in analytics-sync.ts exactly.
+-- NOTE: the RLS policies below are intentionally PERMISSIVE for the demo —
+-- the client writes telemetry with the public anon key, so any visitor can
+-- insert/read analytics rows. For production, route writes through an edge
+-- function using the service-role key and lock these down (or scope by user_id).
+CREATE TABLE IF NOT EXISTS public.ed_analytics_events (
+  id TEXT PRIMARY KEY,
+  type TEXT NOT NULL,
+  name TEXT NOT NULL,
+  timestamp TIMESTAMPTZ NOT NULL,
+  session_id TEXT NOT NULL,
+  user_id TEXT,
+  properties JSONB DEFAULT '{}',
+  screen TEXT,
+  ab_test_variant TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_ed_events_session ON public.ed_analytics_events(session_id);
+CREATE INDEX IF NOT EXISTS idx_ed_events_timestamp ON public.ed_analytics_events(timestamp DESC);
+
+CREATE TABLE IF NOT EXISTS public.ed_analytics_sessions (
+  id TEXT PRIMARY KEY,
+  started_at TIMESTAMPTZ NOT NULL,
+  ended_at TIMESTAMPTZ,
+  duration INTEGER,
+  screens TEXT[] DEFAULT '{}',
+  event_count INTEGER DEFAULT 0,
+  exit_screen TEXT,
+  ab_tests TEXT[] DEFAULT '{}'
+);
+CREATE INDEX IF NOT EXISTS idx_ed_sessions_started ON public.ed_analytics_sessions(started_at DESC);
+
+CREATE TABLE IF NOT EXISTS public.ed_performance_metrics (
+  id TEXT PRIMARY KEY,
+  type TEXT NOT NULL,
+  name TEXT NOT NULL,
+  value DOUBLE PRECISION NOT NULL,
+  unit TEXT NOT NULL,
+  timestamp TIMESTAMPTZ NOT NULL,
+  session_id TEXT NOT NULL,
+  screen TEXT,
+  metadata JSONB DEFAULT '{}'
+);
+CREATE INDEX IF NOT EXISTS idx_ed_perf_timestamp ON public.ed_performance_metrics(timestamp DESC);
+
+ALTER TABLE public.ed_analytics_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ed_analytics_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ed_performance_metrics ENABLE ROW LEVEL SECURITY;
+
+DO $$
+DECLARE t TEXT;
+BEGIN
+  FOREACH t IN ARRAY ARRAY['ed_analytics_events','ed_analytics_sessions','ed_performance_metrics']
+  LOOP
+    EXECUTE format('DROP POLICY IF EXISTS "demo anon insert" ON public.%I;', t);
+    EXECUTE format('CREATE POLICY "demo anon insert" ON public.%I FOR INSERT TO anon, authenticated WITH CHECK (true);', t);
+    EXECUTE format('DROP POLICY IF EXISTS "demo anon update" ON public.%I;', t);
+    EXECUTE format('CREATE POLICY "demo anon update" ON public.%I FOR UPDATE TO anon, authenticated USING (true) WITH CHECK (true);', t);
+    EXECUTE format('DROP POLICY IF EXISTS "demo anon select" ON public.%I;', t);
+    EXECUTE format('CREATE POLICY "demo anon select" ON public.%I FOR SELECT TO anon, authenticated USING (true);', t);
+  END LOOP;
+END $$;

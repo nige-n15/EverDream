@@ -51,6 +51,8 @@ import DreamVisualizer from './components/dreams/DreamVisualizer';
 import DreamCapture from './components/dreams/DreamCapture';
 import { VideoCaptureFlow } from './components/VideoCaptureFlow';
 import { saveVideo, clearAllVideos } from './lib/storage/videoStore';
+import { supabase as supabaseClient, getCurrentUser } from './lib/supabase/client';
+import { initDreamService } from './lib/dreamService';
 import { analyzeDream, type DreamAnalysis } from './lib/dream-analyzer';
 import type { DreamAsset } from './modules/sleep/types';
 
@@ -359,6 +361,17 @@ const DreamJournalApp = () => {
       }
     };
     loadData();
+
+    // Initialize Supabase (anonymous auth) so saved dreams can mirror to the
+    // cloud. Non-blocking; on failure the app stays in local-only mode.
+    initDreamService()
+      .then((ready) => {
+        console.log(ready
+          ? '[App] Supabase ready — dreams will mirror to cloud'
+          : '[App] Supabase not configured — local-only mode');
+      })
+      .catch((err) => console.warn('[App] Supabase init failed:', err));
+
     // Signal loading complete after data is fetched
     const loadingTimer = setTimeout(() => {
       setIsAppLoading(false);
@@ -383,12 +396,75 @@ const DreamJournalApp = () => {
   }, [route.screen]);
 
   // Save dreams
+  // Mirror dreams to the Supabase cloud (non-blocking, batched upsert).
+  // No-op when the user is signed out or has no profile row, so the app
+  // continues to work in local-only mode without errors.
+  const syncDreamsToSupabase = async (dreamsToSync: Dream[]): Promise<void> => {
+    const user = await getCurrentUser();
+    if (!user) return; // not signed in — local-only mode
+
+    const { data: profile } = await supabaseClient
+      .from('profiles')
+      .select('id')
+      .eq('auth_user_id', user.id)
+      .single();
+
+    const userId = profile?.id;
+    if (!userId) {
+      console.warn('[Supabase] No profile for user — skipping cloud sync');
+      return;
+    }
+
+    const records = dreamsToSync
+      .filter((d) => !d.isSample)
+      .map((dream) => ({
+        id: dream.id,
+        user_id: userId,
+        content: dream.content,
+        category: dream.category || 'uncategorized',
+        themes: dream.themes || [],
+        emotion: dream.emotion || 'neutral',
+        symbols: dream.symbols || [],
+        narrative: dream.narrative || null,
+        nugget: dream.nugget || null,
+        interpretation: dream.interpretation || null,
+        mood_valence: dream.moodValence ?? null,
+        capture_mode: dream.captureMode || 'text',
+        generated_image_url: dream.generatedImage?.url || null,
+        generated_image_prompt: dream.generatedImage?.prompt || null,
+        generated_image_style: dream.generatedImage?.style || null,
+        generated_image_source: dream.generatedImage?.source || null,
+        visibility: 'private',
+        is_sample: false,
+        is_deleted: false,
+        local_created_at: dream.date,
+        local_updated_at: new Date().toISOString(),
+        video_capture: dream.videoCapture || null,
+        source_audio: dream.audioFile || null,
+        context: dream.context || null,
+        sleep_data: dream.sleepData || null,
+      }));
+
+    if (records.length === 0) return;
+
+    const { error } = await supabaseClient.from('dreams').upsert(records);
+    if (error) {
+      console.error('[Supabase] upsert error:', error);
+    } else {
+      console.log(`[Supabase] Synced ${records.length} dream(s) to cloud`);
+    }
+  };
+
   const saveDreamsToStorage = async (dreamsToSave: Dream[]) => {
     try {
       await window.storage?.set('dreams', JSON.stringify(dreamsToSave));
     } catch (error) {
       console.error('Storage error:', error);
     }
+    // Mirror to Supabase cloud (fire-and-forget; safe no-op when signed out)
+    syncDreamsToSupabase(dreamsToSave).catch((err: unknown) => {
+      console.warn('[Supabase] background sync failed:', err);
+    });
   };
 
   // Generate dream image using free AI image generation (Pollinations.ai)
